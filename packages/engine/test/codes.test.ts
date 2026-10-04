@@ -61,6 +61,19 @@ describe('filterCandidates', () => {
     }
   });
 
+  it('rejects a guess that is not a valid code, even for an empty candidate list', () => {
+    for (const bad of ['abcd', '1123', '12', '1234\n']) {
+      expect(() => filterCandidates(allCodes(), bad, 0)).toThrow(/Invalid guess/);
+      expect(() => filterCandidates([], bad, 0)).toThrow(/Invalid guess/);
+      expect(() => candidatesFromHistory([{ guess: bad, feedback: 0 }])).toThrow(RangeError);
+    }
+  });
+
+  it('an impossible feedback value matches nothing instead of throwing', () => {
+    expect(filterCandidates(allCodes(), '0123', 31)).toEqual([]);
+    expect(filterCandidates(allCodes(), '0123', 99)).toEqual([]);
+  });
+
   it('leaves only the secret after a 4-dead answer', () => {
     expect(filterCandidates(allCodes(), '1234', 40)).toEqual(['1234']);
   });

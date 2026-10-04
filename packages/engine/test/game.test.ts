@@ -143,6 +143,9 @@ describe('findLies', () => {
 
   it('rejects a revealed secret that is not a valid code', () => {
     expect(() => findLies(guesses, [11], 1, '1123')).toThrow(/Invalid secret/);
+    // Even when there is nothing to check, a bad secret is still an error.
+    expect(() => findLies([], [], 1, '1123')).toThrow(/Invalid secret/);
+    expect(() => findLies([], [], 0, 'abcd')).toThrow(/Invalid secret/);
     expect(() => findHits(guesses, ['1123', '5678'])).toThrow(/Invalid secret of seat 0/);
     expect(() => findHits(guesses, ['1234', 'abcd'])).toThrow(/Invalid secret of seat 1/);
     expect(() => verdictFromSecrets(guesses, ['1234', '55'])).toThrow(RangeError);

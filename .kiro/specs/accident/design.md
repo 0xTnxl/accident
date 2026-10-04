@@ -65,7 +65,13 @@ export interface Storage { get(k: string): Promise<string|null>; set(k: string, 
 export interface Clock { now(): number; setTimeout(fn: () => void, ms: number): () => void; }
 ```
 
-Engine API (`packages/engine`): `isValidCode`, `score(secret, guess) -> number`, `isValidFeedback(n)`, `allCodes()`, `filterCandidates(candidates, guess, feedback)`, `chooseGuess(level, candidates, rng)`.
+Engine API (`packages/engine`, implemented). Every exported function validates its input and throws `RangeError`, so it is safe on opponent-controlled data. Unchecked fast paths live in an internal module and are not exported.
+
+- Rules: `isValidCode`, `assertCode`, `score`, `scoreParts`, `isValidFeedback`, `assertFeedback`, `encodeFeedback`, `decodeFeedback`, `VALID_FEEDBACK`, `guesserOf`, `answererOf`, `roundOf`.
+- Candidates: `allCodes`, `filterCandidates`, `candidatesFromHistory`.
+- Game: `gameStatus(feedbacks)` for live play; `findHits`, `verdictFromSecrets`, `findLies` for the post-reveal checks the protocol finalisation uses.
+- Computer: `chooseGuess(level, candidates, rng)`, `chooseGuessHard`, `LEVELS`, `OPENING_GUESS`.
+- Randomness: `secureRng()` (WebCrypto; use for a player's real secret), `mulberry32(seed)` (tests only), `randomCode(rng)`, `randomInt`, `pick`.
 
 Protocol API (`packages/protocol`): `commitment`, `encodeCommitMemo`, `encodeRevealMemo`, `parseMemo`, `signMessage`, `verifyMessage`, `Session` (state machine), `finalise`, `transcriptHash`.
 
