@@ -28,10 +28,10 @@ Ordered to the PRD build plan, 4 to 12 October 2026. Each task lists the require
 ## Day 1: Mon 5 Oct, commitment, Memos, vault, drip
 
 - [ ] 5. Commitment and Memo helpers in `protocol` (REQ-7, REQ-8)
-  - [ ] 5.1 `commitment()`; A.2 vector in Node; four negative tests
-  - [ ] 5.2 `encodeCommitMemo`, `encodeRevealMemo`, strict `parseMemo` (both reveal forms)
+  - [x] 5.1 `commitment()`; A.2 vector in Node; four negative tests
+  - [x] 5.2 `encodeCommitMemo`, `encodeRevealMemo`, strict `parseMemo` (both reveal forms)
   - [ ] 5.3 `Chain` adapter on web3.js v1: `sendMemo`, `getMemoTx`, `listMemoTxs`, retry and backoff
-  - [ ] 5.4 Memo tests: wrong signer, text or room rejected; first-wins canonical selection
+  - [x] 5.4 Memo tests: wrong signer, text or room rejected; first-wins canonical selection (pure selection logic done; fetching by signature belongs to 5.3)
 - [ ] 6. Vault and keys (REQ-5)
   - [ ] 6.1 Burner keypair, localStorage plus IndexedDB, `storage.persist()`
   - [ ] 6.2 Save secret and salt before any commit send
@@ -45,7 +45,7 @@ Ordered to the PRD build plan, 4 to 12 October 2026. Each task lists the require
 ## Day 2: Tue 6 Oct, protocol and full game
 
 - [ ] 8. Messages and transport (REQ-10)
-  - [ ] 8.1 `signMessage`, `verifyMessage`, parsing, seq handling with buffering
+  - [ ] 8.1 `signMessage`, `verifyMessage`, parsing (done); seq handling with buffering (session, not yet)
   - [ ] 8.2 In-memory `Transport` and fake `Chain` for tests
   - [ ] 8.3 Supabase Realtime `Transport` adapter
   - [ ] 8.4 SYNC and resend timer; drop, duplicate and reorder tests
@@ -54,8 +54,8 @@ Ordered to the PRD build plan, 4 to 12 October 2026. Each task lists the require
   - [ ] 9.2 Commit, publish COMMIT, verify opponent commit, open the play gate
   - [ ] 9.3 Auto-answer, guess turn flow, end rules, reveal Memo and REVEAL
 - [ ] 10. Finalisation (REQ-12, REQ-15.3)
-  - [ ] 10.1 Pure `finalise` and `transcriptHash`
-  - [ ] 10.2 Attack tests: lying answer, false 40, hidden 40, invalid secret, forged signature, replay or out-of-order, out-of-turn guess, feedback 31, commit equivocation, missing reveal (REQ-18.3)
+  - [x] 10.1 Pure `finalise` and `transcriptHash` (plus `assembleTranscript`)
+  - [ ] 10.2 Attack tests (done: lying answer, false 40, hidden 40, invalid secret, forged signature, feedback 31, commit equivocation, missing reveal; still to do at session level: replayed or out-of-order seq, out-of-turn guess): lying answer, false 40, hidden 40, invalid secret, forged signature, replay or out-of-order, out-of-turn guess, feedback 31, commit equivocation, missing reveal (REQ-18.3)
 - [ ] 11. House Bot (REQ-17), decision point
   - [ ] 11.1 Node bot using `protocol`; honest mode
   - [ ] 11.2 Cheating mode for the demo and tests

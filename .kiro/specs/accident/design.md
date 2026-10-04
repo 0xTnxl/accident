@@ -73,7 +73,14 @@ Engine API (`packages/engine`, implemented). Every exported function validates i
 - Computer: `chooseGuess(level, candidates, rng)`, `chooseGuessHard`, `LEVELS`, `OPENING_GUESS`.
 - Randomness: `secureRng()` (WebCrypto; use for a player's real secret), `mulberry32(seed)` (tests only), `randomCode(rng)`, `randomInt`, `pick`.
 
-Protocol API (`packages/protocol`): `commitment`, `encodeCommitMemo`, `encodeRevealMemo`, `parseMemo`, `signMessage`, `verifyMessage`, `Session` (state machine), `finalise`, `transcriptHash`.
+Protocol API (`packages/protocol`, pure core implemented; session and adapters pending). WebCrypto and tweetnacl only; no DOM, network or RPC.
+
+- Identifiers and bytes: `generateRoomCode`, `isValidRoom`, `generateSaltHex`, `isValidPublicKey`, `isValidSignature`, hex and SHA-256 helpers.
+- Commitment: `commitment`, `verifyCommitment` (hex strings for salt and commitment, base58 for keys).
+- Memo records: `encodeCommitMemo`, `encodeRevealMemo`, `parseMemo`, `selectCommit`, `selectReveal` (earliest successful record wins; a different later one sets `equivocated` or `conflicting`).
+- Messages: `generateIdentity`, `identityFromSecretKey`, `signMessage`, `verifyMessage`, `createVerifier`, `encodeMessage`, `parseMessage`, `openMessage`, `encodeBody`, `decodeBody`. Payloads use a strict grammar: canonical decimals, no extra fields, 1,024-character limit.
+- Transcript: `assembleTranscript(room, messages)` (order-independent, drops forgeries and strangers, flags equivocation), `transcriptMessages`, `transcriptLines`, `transcriptHash`.
+- Verdict: `finalise({transcript, commits, reveals, revealWindowClosed})` returns `pending`, `abandoned` or `final`. A final verdict carries `result`, `reason` (`fault`, `both-at-fault`, `first-hit`, `equal-round`, `cap`) and the evidence for every `Fault`. `toChainCommit` and `toChainReveal` adapt the Memo selectors.
 
 ## 3. Wire format
 
