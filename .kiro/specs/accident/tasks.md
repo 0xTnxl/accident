@@ -4,15 +4,15 @@ Ordered to the PRD build plan, 4 to 12 October 2026. Each task lists the require
 
 ## Day 0: Sun 4 Oct, foundation and practice
 
-- [ ] 1. Scaffold the monorepo (REQ-18)
-  - [ ] 1.1 pnpm workspace, `tsconfig.base.json` (strict), ESLint, Prettier, Vitest, pinned versions
-  - [ ] 1.2 `LICENSE` (MIT default), `README.md` stub, `.gitignore` (includes `.env*`), `.env.example`
-  - [ ] 1.3 GitHub Actions: install, typecheck, lint, test
-- [ ] 2. Engine package (REQ-3)
-  - [ ] 2.1 `isValidCode`, `score`, `isValidFeedback`, `allCodes`
-  - [ ] 2.2 `filterCandidates`
-  - [ ] 2.3 Strategies: easy, medium, hard (minimax, sum of squares tie-break, opener 0123)
-  - [ ] 2.4 Tests: A.1 vectors, symmetry, 5,040 codes, candidate filtering, strategy averages (REQ-18.4)
+- [x] 1. Scaffold the monorepo (REQ-18)
+  - [x] 1.1 pnpm workspace, `tsconfig.base.json` (strict), ESLint, Prettier, Vitest, pinned versions (TypeScript is pinned to 6.0.3 because typescript-eslint does not support TS 7 yet)
+  - [x] 1.2 `LICENSE` (MIT default), `README.md` stub, `.gitignore` (includes `.env*`), `.env.example`
+  - [x] 1.3 GitHub Actions: install, typecheck, lint, test
+- [x] 2. Engine package (REQ-3)
+  - [x] 2.1 `isValidCode`, `score`, `isValidFeedback`, `allCodes`
+  - [x] 2.2 `filterCandidates`
+  - [x] 2.3 Strategies: easy, medium, hard (minimax, sum of squares tie-break, opener 0123)
+  - [x] 2.4 Tests: A.1 vectors, symmetry, 5,040 codes, candidate filtering, strategy averages (REQ-18.4)
 - [ ] 3. Web app shell and practice mode (REQ-1, REQ-2)
   - [ ] 3.1 Vite + React + Tailwind + Zustand app, PWA manifest and service worker
   - [ ] 3.2 Home, How to play (1964 / 2604 example), keypad, pick secret, practice board
