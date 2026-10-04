@@ -1,5 +1,6 @@
+import { scoreUnchecked } from './internal.js';
 import type { Code, Feedback } from './rules.js';
-import { CODE_LENGTH, isValidCode, score } from './rules.js';
+import { CODE_LENGTH, assertCode, isValidCode } from './rules.js';
 
 let cache: readonly Code[] | undefined;
 
@@ -18,21 +19,32 @@ export function allCodes(): readonly Code[] {
   return cache;
 }
 
-/** Candidates that would have produced `feedback` for `guess`. */
+/**
+ * Candidates that would have produced `feedback` for `guess`.
+ *
+ * `guess` must be a valid code (throws `RangeError` otherwise). `candidates` are trusted to be
+ * valid codes, as they normally come from {@link allCodes}. A `feedback` value that cannot occur
+ * simply matches no candidate, so the result is empty.
+ */
 export function filterCandidates(
   candidates: readonly Code[],
   guess: Code,
   feedback: Feedback,
 ): Code[] {
-  return candidates.filter((secret) => score(secret, guess) === feedback);
+  assertCode(guess, 'guess');
+  return candidates.filter((secret) => scoreUnchecked(secret, guess) === feedback);
 }
 
+/** One answered guess. */
 export interface Turn {
   guess: Code;
   feedback: Feedback;
 }
 
-/** Codes consistent with every (guess, feedback) pair in `history`. */
+/**
+ * Codes consistent with every (guess, feedback) pair in `history`.
+ * An empty result means the answers contradict each other, so someone gave a wrong answer.
+ */
 export function candidatesFromHistory(history: readonly Turn[]): Code[] {
   let candidates: Code[] = [...allCodes()];
   for (const turn of history) {

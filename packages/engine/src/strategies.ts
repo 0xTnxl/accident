@@ -1,10 +1,11 @@
 import { allCodes } from './codes.js';
+import { scoreUnchecked } from './internal.js';
 import type { Rng } from './rng.js';
 import { pick } from './rng.js';
 import type { Code } from './rules.js';
-import { score } from './rules.js';
 
-export type Level = 'easy' | 'medium' | 'hard';
+export const LEVELS = ['easy', 'medium', 'hard'] as const;
+export type Level = (typeof LEVELS)[number];
 
 /** Fixed first guess for the computer, as measured in the PRD (section 7). */
 export const OPENING_GUESS: Code = '0123';
@@ -20,7 +21,7 @@ export const EASY_RANDOM_RATE = 0.35;
 export function chooseGuessHard(candidates: readonly Code[]): Code {
   const first = candidates[0];
   if (first === undefined) throw new RangeError('No candidates left');
-  if (candidates.length <= 2) return first;
+  if (candidates.length === 1) return first;
 
   let best: Code = first;
   let bestMax = Infinity;
@@ -28,7 +29,7 @@ export function chooseGuessHard(candidates: readonly Code[]): Code {
 
   for (const guess of candidates) {
     const buckets = new Uint16Array(45);
-    for (const secret of candidates) buckets[score(secret, guess)]!++;
+    for (const secret of candidates) buckets[scoreUnchecked(secret, guess)]!++;
 
     let max = 0;
     let sumSquares = 0;

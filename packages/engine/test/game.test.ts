@@ -141,6 +141,20 @@ describe('findLies', () => {
     expect(findLies(guesses, [11, 99, 20], 0, '1964')).toEqual([1]);
   });
 
+  it('rejects a revealed secret that is not a valid code', () => {
+    expect(() => findLies(guesses, [11], 1, '1123')).toThrow(/Invalid secret/);
+    expect(() => findHits(guesses, ['1123', '5678'])).toThrow(/Invalid secret of seat 0/);
+    expect(() => findHits(guesses, ['1234', 'abcd'])).toThrow(/Invalid secret of seat 1/);
+    expect(() => verdictFromSecrets(guesses, ['1234', '55'])).toThrow(RangeError);
+  });
+
+  it('throws if a guess it has to check is not a valid code', () => {
+    // Index 0 is answered by seat 1, so seat 1's check reaches the invalid guess.
+    expect(() => findLies(['2222'], [0], 1, '1964')).toThrow(/Invalid guess/);
+    // Seat 0 answers nothing at index 0, so that guess is never scored for seat 0.
+    expect(findLies(['2222'], [0], 0, '1964')).toEqual([]);
+  });
+
   it('ignores answers that go beyond the guesses made', () => {
     expect(findLies(['2604'], [11, 0], 0, '1964')).toEqual([]);
     expect(findLies([], [0], 1, '1964')).toEqual([]);

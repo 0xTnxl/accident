@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   EASY_RANDOM_RATE,
+  LEVELS,
   OPENING_GUESS,
   allCodes,
   candidatesFromHistory,
@@ -10,6 +11,16 @@ import {
   score,
 } from '../src/index.js';
 import { simulate, solve } from './helpers.js';
+
+/** An rng that returns the given values in order. */
+function sequence(values: number[]): () => number {
+  let i = 0;
+  return () => {
+    const v = values[i++];
+    if (v === undefined) throw new Error('sequence exhausted');
+    return v;
+  };
+}
 
 describe('chooseGuess', () => {
   it.each(['easy', 'medium', 'hard'] as const)(
@@ -57,9 +68,55 @@ describe('chooseGuess', () => {
     );
   });
 
-  it('hard returns the only candidate, or the smallest of two', () => {
+  it('hard returns the only candidate, or the smallest of two whatever the input order', () => {
     expect(chooseGuessHard(['4321'])).toBe('4321');
     expect(chooseGuessHard(['1234', '4321'])).toBe('1234');
+    expect(chooseGuessHard(['4321', '1234'])).toBe('1234');
+  });
+
+  it('hard throws when there are no candidates', () => {
+    expect(() => chooseGuessHard([])).toThrow(/No candidates/);
+  });
+
+  it('hard gives the same answer whatever the order of the candidates', () => {
+    const candidates = candidatesFromHistory([{ guess: '0123', feedback: score('1964', '0123') }]);
+    const shuffled = [...candidates].reverse();
+    expect(chooseGuessHard(shuffled)).toBe(chooseGuessHard(candidates));
+  });
+
+  it('hard finds a guess that splits the candidates better than a blind guess', () => {
+    const candidates = candidatesFromHistory([{ guess: '0123', feedback: 1 }]);
+    const guess = chooseGuessHard(candidates);
+    const biggest = (g: string): number => {
+      const sizes = new Map<number, number>();
+      for (const s of candidates) sizes.set(score(s, g), (sizes.get(score(s, g)) ?? 0) + 1);
+      return Math.max(...sizes.values());
+    };
+    expect(biggest(guess)).toBeLessThan(candidates.length / 3);
+  });
+
+  it('easy follows the random branch when the dice say so, and the normal branch otherwise', () => {
+    const candidates = candidatesFromHistory([{ guess: '0123', feedback: score('1964', '0123') }]);
+    // rng values: first call decides the branch, second picks the element
+    const randomBranch = chooseGuess('easy', candidates, sequence([0.1, 0.5]));
+    const normalBranch = chooseGuess('easy', candidates, sequence([0.9, 0.5]));
+    expect(allCodes()).toContain(randomBranch);
+    expect(candidates).toContain(normalBranch);
+    expect(randomBranch).toBe(allCodes()[Math.floor(0.5 * allCodes().length)]);
+    expect(normalBranch).toBe(candidates[Math.floor(0.5 * candidates.length)]);
+  });
+
+  it('lists the three levels', () => {
+    expect([...LEVELS]).toEqual(['easy', 'medium', 'hard']);
+  });
+
+  it('a Hard move stays fast enough for a slow phone (budget: 2 s here)', () => {
+    // The largest class after the opener 0123 is feedback 01 with 1,440 candidates.
+    const largest = candidatesFromHistory([{ guess: '0123', feedback: 1 }]);
+    expect(largest).toHaveLength(1440);
+    const start = performance.now();
+    chooseGuessHard(largest);
+    expect(performance.now() - start).toBeLessThan(2000);
   });
 
   it('hard never increases the worst-case bucket versus a random consistent guess', () => {
@@ -76,6 +133,44 @@ describe('chooseGuess', () => {
       const other = candidates[Math.floor(rng() * candidates.length)]!;
       expect(worst(hard)).toBeLessThanOrEqual(worst(other));
     }
+  });
+});
+
+describe('hard strategy golden values', () => {
+  // These pin the exact behaviour of the documented rule (minimise the largest bucket, then the
+  // sum of squared bucket sizes, then the smallest code), so any change to the tie-break or the
+  // search is noticed. They are a regression snapshot of this implementation, not independent
+  // ground truth. The totals agree with the PRD figures (average 5.32, worst case 8).
+  it('replies to the opener 0123 exactly as recorded', () => {
+    const expected: Record<number, [size: number, reply: string]> = {
+      0: [360, '4567'],
+      1: [1440, '1456'],
+      2: [1260, '1435'],
+      3: [264, '1204'],
+      4: [9, '1230'],
+      10: [480, '0456'],
+      11: [720, '0245'],
+      12: [216, '0234'],
+      13: [8, '0231'],
+      20: [180, '0145'],
+      21: [72, '0134'],
+      22: [6, '0132'],
+      30: [24, '0124'],
+    };
+    for (const [feedback, [size, reply]] of Object.entries(expected)) {
+      const candidates = candidatesFromHistory([{ guess: '0123', feedback: Number(feedback) }]);
+      expect(candidates).toHaveLength(size);
+      expect(chooseGuessHard(candidates)).toBe(reply);
+    }
+  });
+
+  it('solves all 5,040 secrets with exactly the recorded distribution of guess counts', () => {
+    const distribution: Record<number, number> = {};
+    for (const secret of allCodes()) {
+      const n = solve('hard', secret, mulberry32(1));
+      distribution[n] = (distribution[n] ?? 0) + 1;
+    }
+    expect(distribution).toEqual({ 1: 1, 2: 13, 3: 109, 4: 629, 5: 2071, 6: 1917, 7: 297, 8: 3 });
   });
 });
 

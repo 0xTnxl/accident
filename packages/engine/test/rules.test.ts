@@ -3,6 +3,7 @@ import {
   VALID_FEEDBACK,
   answererOf,
   assertCode,
+  assertFeedback,
   decodeFeedback,
   encodeFeedback,
   guesserOf,
@@ -132,6 +133,84 @@ describe('seat helpers', () => {
     expect([0, 1, 2, 3].map(guesserOf)).toEqual([0, 1, 0, 1]);
     expect([0, 1, 2, 3].map(answererOf)).toEqual([1, 0, 1, 0]);
     expect([0, 1, 2, 3, 22, 23].map(roundOf)).toEqual([0, 0, 1, 1, 11, 11]);
+  });
+
+  it.each([-1, 1.5, NaN, Infinity, -0.5])('reject the invalid index %d', (index) => {
+    expect(() => guesserOf(index)).toThrow(RangeError);
+    expect(() => answererOf(index)).toThrow(RangeError);
+    expect(() => roundOf(index)).toThrow(RangeError);
+  });
+});
+
+describe('input validation at the trust boundary', () => {
+  it.each(['1234\n', '\n1234', '1234 ', '12\n34', '１２３４', '1234\u0000', 'x'.repeat(10_000)])(
+    'score rejects the invalid code %j',
+    (bad) => {
+      expect(() => score(bad, '1234')).toThrow(RangeError);
+      expect(() => score('1234', bad)).toThrow(RangeError);
+      expect(() => scoreParts(bad, '1234')).toThrow(RangeError);
+    },
+  );
+
+  it('score rejects non-string input', () => {
+    for (const bad of [1234, null, undefined, {}, ['1', '2', '3', '4']]) {
+      expect(() => score(bad as unknown as string, '1234')).toThrow(RangeError);
+    }
+  });
+
+  it('names the offending argument without echoing a huge value', () => {
+    expect(() => score('1123', '1234')).toThrow(/Invalid secret/);
+    expect(() => score('1234', '1123')).toThrow(/Invalid guess/);
+    try {
+      score('x'.repeat(100_000), '1234');
+      expect.unreachable();
+    } catch (error) {
+      expect((error as Error).message.length).toBeLessThan(100);
+    }
+  });
+
+  it('a repeated guess is allowed and scores normally', () => {
+    expect(score('1964', '2604')).toBe(score('1964', '2604'));
+  });
+});
+
+describe('feedback encoding', () => {
+  it('round-trips every valid value', () => {
+    for (const value of VALID_FEEDBACK) {
+      const { dead, injured } = decodeFeedback(value);
+      expect(encodeFeedback(dead, injured)).toBe(value);
+    }
+  });
+
+  it.each([
+    [3, 1],
+    [2, 3],
+    [4, 1],
+    [0, 10],
+    [-1, 20],
+    [1.5, 0],
+    [0, 0.5],
+    [5, 0],
+    [0, 5],
+    [NaN, 0],
+    [0, Infinity],
+  ])('encodeFeedback rejects dead=%d injured=%d', (dead, injured) => {
+    expect(() => encodeFeedback(dead, injured)).toThrow(RangeError);
+  });
+
+  it.each([31, 13.5, -1, 44, NaN])('decodeFeedback rejects %d', (value) => {
+    expect(() => decodeFeedback(value)).toThrow(RangeError);
+  });
+
+  it('assertFeedback returns valid values and throws on others', () => {
+    expect(assertFeedback(22)).toBe(22);
+    expect(() => assertFeedback(31, 'answer')).toThrow(/Invalid answer: 31/);
+    expect(() => assertFeedback('22')).toThrow(/Invalid feedback: "22"/);
+  });
+
+  it('VALID_FEEDBACK cannot be modified at runtime', () => {
+    expect(Object.isFrozen(VALID_FEEDBACK)).toBe(true);
+    expect(() => (VALID_FEEDBACK as number[]).push(31)).toThrow(TypeError);
   });
 });
 

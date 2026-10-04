@@ -3,6 +3,7 @@ import {
   MAX_GUESSES,
   WIN_FEEDBACK,
   answererOf,
+  assertCode,
   guesserOf,
   isValidFeedback,
   roundOf,
@@ -88,11 +89,14 @@ export function gameStatus(feedbacks: readonly Feedback[]): GameStatus {
  * Finds each seat's first guess equal to the opponent's revealed secret.
  * `guesses[i]` is made by seat `i % 2`. `secrets[s]` is the secret of seat `s`.
  * Returns `[seat0HitIndex, seat1HitIndex]`, with `undefined` where a seat never hit.
+ * Throws `RangeError` if a secret is not a valid code.
  */
 export function findHits(
   guesses: readonly Code[],
   secrets: readonly [Code, Code],
 ): [number | undefined, number | undefined] {
+  assertCode(secrets[0], 'secret of seat 0');
+  assertCode(secrets[1], 'secret of seat 1');
   const hits: [number | undefined, number | undefined] = [undefined, undefined];
   for (let i = 0; i < guesses.length; i++) {
     const seat = guesserOf(i);
@@ -126,8 +130,14 @@ export function verdictFromSecrets(
 
 /**
  * Indices of answers that contradict the answerer's revealed secret.
- * `answers[i]` is the claimed feedback for `guesses[i]`. Only indices answered by `seat` are checked.
- * Returns the indices whose claimed feedback differs from the true score.
+ *
+ * `answers[i]` is the claimed feedback for `guesses[i]`. Only indices answered by `seat` are
+ * checked, so run it once per seat with that seat's revealed secret. Guesses with no answer yet
+ * are ignored. Any claimed value that differs from the true score is a lie, including values
+ * that are not valid feedback at all.
+ *
+ * Throws `RangeError` if `secret` or a checked guess is not a valid code. The protocol rejects
+ * invalid guesses before they can enter a transcript.
  */
 export function findLies(
   guesses: readonly Code[],
@@ -135,12 +145,11 @@ export function findLies(
   seat: Seat,
   secret: Code,
 ): number[] {
+  assertCode(secret, 'secret');
   const lies: number[] = [];
   const n = Math.min(guesses.length, answers.length);
   for (let i = 0; i < n; i++) {
-    if (answererOf(i) !== seat) continue;
-    const guess = guesses[i];
-    if (guess === undefined || score(secret, guess) !== answers[i]) lies.push(i);
+    if (answererOf(i) === seat && score(secret, guesses[i] as Code) !== answers[i]) lies.push(i);
   }
   return lies;
 }

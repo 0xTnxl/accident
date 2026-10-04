@@ -3,7 +3,12 @@
  *
  * A code is a string of exactly 4 distinct digits "0"-"9". Leading zero allowed.
  * Feedback is an integer: dead * 10 + injured.
+ *
+ * Every function exported here validates its input and throws `RangeError` on bad input,
+ * so it is safe to call with data that came from an opponent.
  */
+
+import { scoreUnchecked } from './internal.js';
 
 export type Code = string;
 export type Feedback = number;
@@ -14,9 +19,11 @@ export const GUESSES_PER_PLAYER = 12;
 export const MAX_GUESSES = GUESSES_PER_PLAYER * 2;
 export const WIN_FEEDBACK: Feedback = 40;
 
+// `$` without the `m` flag matches only at the very end of the input in JavaScript,
+// so a trailing newline is rejected.
 const CODE_PATTERN = /^[0-9]{4}$/;
 
-/** True when `value` is a string of 4 distinct digits. */
+/** True when `value` is a string of 4 distinct digits "0"-"9". */
 export function isValidCode(value: unknown): value is Code {
   if (typeof value !== 'string' || !CODE_PATTERN.test(value)) return false;
   return (
@@ -29,26 +36,51 @@ export function isValidCode(value: unknown): value is Code {
   );
 }
 
-/** Throws if `value` is not a valid code. Returns it typed otherwise. */
+/** Returns `value` typed as a code, or throws `RangeError` naming `label`. */
 export function assertCode(value: unknown, label = 'code'): Code {
-  if (!isValidCode(value)) throw new RangeError(`Invalid ${label}: ${String(value)}`);
+  if (!isValidCode(value)) throw new RangeError(`Invalid ${label}: ${describe(value)}`);
   return value;
 }
 
-/** Bit mask of the digits present in a code. */
-function digitMask(code: Code): number {
-  let mask = 0;
-  for (let i = 0; i < CODE_LENGTH; i++) mask |= 1 << (code.charCodeAt(i) - 48);
-  return mask;
+/** Short, safe description of an untrusted value for error messages. */
+function describe(value: unknown): string {
+  if (typeof value === 'string')
+    return JSON.stringify(value.length > 16 ? `${value.slice(0, 16)}...` : value);
+  return typeof value;
 }
 
-function popcount(n: number): number {
-  let count = 0;
-  while (n) {
-    n &= n - 1;
-    count++;
+/**
+ * The 14 feedback values that can occur: dead + injured <= 4, excluding 31
+ * (3 dead and 1 injured is impossible with distinct digits).
+ */
+export const VALID_FEEDBACK: readonly Feedback[] = Object.freeze(
+  (() => {
+    const values: Feedback[] = [];
+    for (let dead = 0; dead <= CODE_LENGTH; dead++) {
+      for (let injured = 0; dead + injured <= CODE_LENGTH; injured++) {
+        if (dead === 3 && injured === 1) continue;
+        values.push(dead * 10 + injured);
+      }
+    }
+    return values;
+  })(),
+);
+
+const VALID_FEEDBACK_SET: ReadonlySet<number> = new Set(VALID_FEEDBACK);
+
+/** True for exactly the 14 feedback values that can occur. Rejects 31 and dead + injured > 4. */
+export function isValidFeedback(value: unknown): value is Feedback {
+  return typeof value === 'number' && VALID_FEEDBACK_SET.has(value);
+}
+
+/** Returns `value` typed as feedback, or throws `RangeError` naming `label`. */
+export function assertFeedback(value: unknown, label = 'feedback'): Feedback {
+  if (!isValidFeedback(value)) {
+    throw new RangeError(
+      `Invalid ${label}: ${typeof value === 'number' ? value : describe(value)}`,
+    );
   }
-  return count;
+  return value;
 }
 
 export interface DeadInjured {
@@ -56,69 +88,56 @@ export interface DeadInjured {
   injured: number;
 }
 
-/**
- * Dead and injured counts of `guess` against `secret`.
- * Both arguments must be valid codes. This is not re-checked, for speed:
- * callers at trust boundaries use {@link assertCode} or {@link isValidCode}.
- */
-export function scoreParts(secret: Code, guess: Code): DeadInjured {
-  let dead = 0;
-  for (let i = 0; i < CODE_LENGTH; i++) {
-    if (secret.charCodeAt(i) === guess.charCodeAt(i)) dead++;
-  }
-  const common = popcount(digitMask(secret) & digitMask(guess));
-  return { dead, injured: common - dead };
-}
-
-/** Encodes dead and injured as dead * 10 + injured. */
+/** Encodes dead and injured as dead * 10 + injured. Throws if the pair cannot occur. */
 export function encodeFeedback(dead: number, injured: number): Feedback {
-  return dead * 10 + injured;
+  const inRange = (n: number): boolean => Number.isInteger(n) && n >= 0 && n <= CODE_LENGTH;
+  if (!inRange(dead) || !inRange(injured)) {
+    throw new RangeError(`Invalid dead/injured pair: ${dead}, ${injured}`);
+  }
+  return assertFeedback(dead * 10 + injured, 'dead/injured pair');
 }
 
-/** Splits a feedback value into dead and injured. Does not validate. */
+/** Splits a valid feedback value into dead and injured. Throws on an invalid value. */
 export function decodeFeedback(feedback: Feedback): DeadInjured {
+  assertFeedback(feedback);
   return { dead: Math.floor(feedback / 10), injured: feedback % 10 };
 }
 
-/** Feedback of `guess` against `secret`, encoded as dead * 10 + injured. */
+/**
+ * Feedback of `guess` against `secret`, encoded as dead * 10 + injured.
+ * Throws `RangeError` if either argument is not a valid code.
+ */
 export function score(secret: Code, guess: Code): Feedback {
-  const { dead, injured } = scoreParts(secret, guess);
-  return encodeFeedback(dead, injured);
+  assertCode(secret, 'secret');
+  assertCode(guess, 'guess');
+  return scoreUnchecked(secret, guess);
 }
 
-/**
- * The 14 feedback values that can occur: dead + injured <= 4, excluding 31
- * (3 dead and 1 injured is impossible with distinct digits).
- */
-export const VALID_FEEDBACK: readonly Feedback[] = (() => {
-  const values: Feedback[] = [];
-  for (let dead = 0; dead <= CODE_LENGTH; dead++) {
-    for (let injured = 0; dead + injured <= CODE_LENGTH; injured++) {
-      if (dead === 3 && injured === 1) continue;
-      values.push(encodeFeedback(dead, injured));
-    }
+/** Dead and injured counts of `guess` against `secret`. Throws if either is not a valid code. */
+export function scoreParts(secret: Code, guess: Code): DeadInjured {
+  return decodeFeedback(score(secret, guess));
+}
+
+function assertIndex(index: number): void {
+  if (!Number.isInteger(index) || index < 0) {
+    throw new RangeError(`Invalid guess index: ${index}`);
   }
-  return values;
-})();
-
-const VALID_FEEDBACK_SET: ReadonlySet<number> = new Set(VALID_FEEDBACK);
-
-/** True for exactly the 14 feedback values that can occur. Rejects 31 and dead + injured > 4. */
-export function isValidFeedback(value: unknown): value is Feedback {
-  return typeof value === 'number' && Number.isInteger(value) && VALID_FEEDBACK_SET.has(value);
 }
 
 /** The seat that makes guess number `index` (0-based). Seat 0 guesses first. */
 export function guesserOf(index: number): Seat {
+  assertIndex(index);
   return (index % 2) as Seat;
 }
 
 /** The seat that answers guess number `index`. */
 export function answererOf(index: number): Seat {
+  assertIndex(index);
   return (1 - (index % 2)) as Seat;
 }
 
 /** The round (0-based) that guess number `index` belongs to. */
 export function roundOf(index: number): number {
+  assertIndex(index);
   return Math.floor(index / 2);
 }
