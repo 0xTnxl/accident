@@ -22,8 +22,12 @@ export type Phase =
   'connecting' | 'committing' | 'gate' | 'playing' | 'revealing' | 'final' | 'abandoned' | 'closed';
 
 export interface SessionOptions {
-  /** How often unacknowledged messages are sent again. */
+  /** How soon unacknowledged messages are first sent again. It doubles while nothing is heard. */
   resendMs: number;
+  /** The longest gap between repeats while the game is live. */
+  resendMaxMs: number;
+  /** How many repeats to attempt after the game is settled, in case the opponent is still around. */
+  settledResendLimit: number;
   /** How long the player on the clock has before the other side may claim a timeout. */
   turnMs: number;
   /** How long to wait for the opponent's reveal before they forfeit. */
@@ -46,6 +50,8 @@ export interface SessionOptions {
 
 export const DEFAULT_OPTIONS: SessionOptions = {
   resendMs: 3000,
+  resendMaxMs: 30_000,
+  settledResendLimit: 3,
   turnMs: 180_000,
   revealWindowMs: 180_000,
   gateTimeoutMs: 90_000,
@@ -194,6 +200,9 @@ export class Session {
   /** Operations that failed and wait for the player to press retry, so they never spin. */
   private readonly failedOps = new Set<'commit' | 'reveal'>();
   private reconcileQueued = false;
+  /** Consecutive repeats with no reply. Drives the backoff and resets on any sign of life. */
+  private resendStep = 0;
+  private settledResends = 0;
   private turnDeadline: { seat: Seat; at: number; logLength: number } | undefined;
   private readonly inflight = {
     commit: false,
@@ -482,17 +491,30 @@ export class Session {
   }
 
   private armResend(): void {
-    this.arm('resend', this.options.resendMs, () => {
+    const wait = Math.min(this.options.resendMs * 2 ** this.resendStep, this.options.resendMaxMs);
+    this.arm('resend', wait, () => {
       this.detached(async () => {
-        if (this.unacked().length > 0) await this.resendUnacked();
+        if (this.unacked().length > 0) {
+          // Once the game is over, keep trying a few times in case the opponent returns, then stop.
+          if (this.settled && this.settledResends++ >= this.options.settledResendLimit) return;
+          await this.resendUnacked();
+          this.resendStep++;
+        }
         this.armResend();
       });
     });
   }
 
+  /** The opponent is alive: go back to repeating quickly if we ever need to. */
+  private heardFromPeer(): void {
+    this.resendStep = 0;
+    this.settledResends = 0;
+  }
+
   private async onRelayStatus(status: RelayStatus): Promise<void> {
     this.relay = status;
     if (status === 'up') {
+      this.heardFromPeer();
       if (this.s.peerKey) await this.sendSync();
       await this.resendUnacked();
     }
@@ -506,8 +528,10 @@ export class Session {
     const { message, body } = opened;
     if (message.room !== this.s.room || message.from === this.s.publicKey) return;
 
+    let newlyPinned = false;
     if (!this.s.peerKey) {
       if (!this.mayPin(message, body)) return;
+      newlyPinned = true;
       this.s.peerKey = message.from;
       this.s.peerSeenAt = this.config.clock.now();
     } else if (message.from !== this.s.peerKey) {
@@ -516,6 +540,7 @@ export class Session {
 
     if (body.type === 'SYNC') {
       if (body.received > this.s.acked) {
+        this.heardFromPeer();
         this.s.acked = body.received;
         await this.persist();
       }
@@ -530,7 +555,10 @@ export class Session {
     }
     if (message.seq > expected && this.pending.size >= this.options.maxPending) return;
     this.pending.set(message.seq, { message, body });
-    await this.pump();
+    const progressed = await this.pump();
+    if (progressed) this.heardFromPeer();
+    // They only now know we exist, so tell them what we have said rather than wait for the timer.
+    if (newlyPinned) await this.resendUnacked();
     if (message.seq > expected) await this.sendSync(); // ask for whatever is missing
     this.schedule();
   }
