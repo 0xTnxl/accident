@@ -507,8 +507,11 @@ export class Session {
 
   /** The opponent is alive: go back to repeating quickly if we ever need to. */
   private heardFromPeer(): void {
-    this.resendStep = 0;
     this.settledResends = 0;
+    if (this.resendStep === 0) return;
+    // A timer armed during a long silence may be seconds away. Shorten it now.
+    this.resendStep = 0;
+    if (this.started && !this.closed) this.armResend();
   }
 
   private async onRelayStatus(status: RelayStatus): Promise<void> {

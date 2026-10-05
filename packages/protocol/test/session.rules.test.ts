@@ -320,6 +320,17 @@ describe('background work ends with the game', () => {
 
   it('goes back to repeating quickly once a stalled opponent starts moving again', async () => {
     const world = newWorld();
+    // Acknowledgements never arrive, so only real game messages can show the opponent is alive.
+    const lost: { next: boolean } = { next: false };
+    world.hub.drop = (frame) => {
+      const type = parseMessage(frame.raw)?.type;
+      if (type === 'SYNC') return true;
+      if (lost.next && frame.from === 'host' && type === 'GUESS') {
+        lost.next = false;
+        return true;
+      }
+      return false;
+    };
     const host = makePlayer(world, { name: 'host', role: 'host', secret: '1964', identityByte: 1 });
     const guest = makePlayer(world, {
       name: 'guest',
@@ -331,32 +342,29 @@ describe('background work ends with the game', () => {
     await guest.session.start();
     autoplay(host, 'medium', 1);
     autoplay(guest, 'medium', 2);
-    await until(world, () => host.session.view().guesses.length >= 3, 60_000, 10);
+    await until(world, () => host.session.view().guesses.length >= 3, 120_000, 10);
 
-    // The guest's connection dies while the host's last message is unanswered. The host backs off.
+    // The guest vanishes for a long time, so the host backs off to its 30 s maximum gap.
     world.hub.setLink('guest', 'down');
     await world.clock.advance(200_000);
 
-    // The guest returns and plays on. From here the opponent is clearly alive.
+    // The guest returns and the game moves again.
     world.hub.setLink('guest', 'up');
-    await world.clock.advance(5_000);
-    const before = host.session.view().guesses.length;
-    expect(before).toBeGreaterThan(3);
+    await until(world, () => host.session.view().guesses.length >= 7, 120_000, 100);
+    expect(host.session.view().guesses.length).toBeGreaterThanOrEqual(7);
 
-    // Now lose everything the host sends for a moment and then recover. Had the backoff stayed at
-    // its 30 s maximum, repairing this loss would take 30 s. It should take about 3 s.
-    let dropping = true;
-    world.hub.drop = (frame) => dropping && frame.from === 'host';
-    await world.clock.advance(100);
-    dropping = false;
+    // Now the host's next guess is lost. Repair should take seconds, not another 30 s backoff.
+    lost.next = true;
+    const answered = host.session.view().answers.length;
     const started = world.clock.now();
     await until(
       world,
-      () => host.session.view().guesses.length > before + 1 || isDone(host),
-      60_000,
+      () => host.session.view().answers.length > answered || isDone(host),
+      120_000,
       100,
     );
-    expect(world.clock.now() - started).toBeLessThan(15_000);
+    expect(host.session.view().answers.length).toBeGreaterThan(answered);
+    expect(world.clock.now() - started).toBeLessThan(10_000);
   });
 
   it('a late friend still hears the host at once, not after a long backoff', async () => {
