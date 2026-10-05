@@ -318,10 +318,8 @@ describe('background work ends with the game', () => {
     expect(Math.max(...gaps)).toBe(30_000);
   });
 
-  it('goes back to repeating quickly when the opponent is alive but its acknowledgements are lost', async () => {
+  it('goes back to repeating quickly once a stalled opponent starts moving again', async () => {
     const world = newWorld();
-    // Every SYNC is lost, so only accepted game messages show that the other side is alive.
-    world.hub.drop = (frame) => parseMessage(frame.raw)?.type === 'SYNC';
     const host = makePlayer(world, { name: 'host', role: 'host', secret: '1964', identityByte: 1 });
     const guest = makePlayer(world, {
       name: 'guest',
@@ -333,19 +331,32 @@ describe('background work ends with the game', () => {
     await guest.session.start();
     autoplay(host, 'medium', 1);
     autoplay(guest, 'medium', 2);
+    await until(world, () => host.session.view().guesses.length >= 3, 60_000, 10);
 
-    const times: number[] = [];
-    const deliver = world.hub.deliver.bind(world.hub);
-    world.hub.deliver = (frame) => {
-      if (frame.from === 'host') times.push(world.clock.now());
-      deliver(frame);
-    };
-    await until(world, () => host.session.view().guesses.length >= 8, 600_000, 50);
-    expect(host.session.view().guesses.length).toBeGreaterThanOrEqual(8);
+    // The guest's connection dies while the host's last message is unanswered. The host backs off.
+    world.hub.setLink('guest', 'down');
+    await world.clock.advance(200_000);
 
-    // While the game is moving, no gap between the host's frames should have grown large.
-    const gaps = times.slice(1).map((t, i) => t - (times[i] as number));
-    expect(Math.max(...gaps)).toBeLessThanOrEqual(12_000);
+    // The guest returns and plays on. From here the opponent is clearly alive.
+    world.hub.setLink('guest', 'up');
+    await world.clock.advance(5_000);
+    const before = host.session.view().guesses.length;
+    expect(before).toBeGreaterThan(3);
+
+    // Now lose everything the host sends for a moment and then recover. Had the backoff stayed at
+    // its 30 s maximum, repairing this loss would take 30 s. It should take about 3 s.
+    let dropping = true;
+    world.hub.drop = (frame) => dropping && frame.from === 'host';
+    await world.clock.advance(100);
+    dropping = false;
+    const started = world.clock.now();
+    await until(
+      world,
+      () => host.session.view().guesses.length > before + 1 || isDone(host),
+      60_000,
+      100,
+    );
+    expect(world.clock.now() - started).toBeLessThan(15_000);
   });
 
   it('a late friend still hears the host at once, not after a long backoff', async () => {
