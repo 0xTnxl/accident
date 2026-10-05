@@ -367,6 +367,58 @@ describe('background work ends with the game', () => {
     expect(world.clock.now() - started).toBeLessThan(10_000);
   });
 
+  it('retries quickly after its own connection comes back, even if nobody has answered', async () => {
+    const world = newWorld();
+    const host = makePlayer(world, { name: 'host', role: 'host', secret: '1964', identityByte: 1 });
+    await host.session.start();
+    await world.clock.advance(200_000); // alone for a long time, so it has backed off to the maximum
+
+    const times: number[] = [];
+    const deliver = world.hub.deliver.bind(world.hub);
+    world.hub.deliver = (frame) => {
+      if (frame.from === 'host') times.push(world.clock.now());
+      deliver(frame);
+    };
+    world.hub.setLink('host', 'down');
+    world.hub.setLink('host', 'up');
+    await world.clock.advance(20_000);
+
+    // Straight away, then again after 3 s and 9 s, not a 30 s wait.
+    expect(times).toEqual([200_000, 203_000, 209_000]);
+  });
+
+  it('an acknowledgement alone is enough to make it repeat quickly again', async () => {
+    const world = newWorld();
+    const host = makePlayer(world, { name: 'host', role: 'host', secret: '1964', identityByte: 1 });
+    await host.session.start();
+    await world.clock.advance(200_000);
+
+    // A guest arrives and goes silent. The host keeps repeating its unacknowledged COMMIT and backs
+    // off: repeats at 203, 209, 221, 245 s, with the next due at 275 s (inside the 90 s gate wait).
+    const guest = new Sender(identityFromByte(2), ROOM);
+    world.hub.inject(ROOM, 'guest', encodeMessage(guest.send({ type: 'HELLO', role: 'guest' })));
+    const times: number[] = [];
+    const deliver = world.hub.deliver.bind(world.hub);
+    world.hub.deliver = (frame) => {
+      if (frame.from === 'host' && parseMessage(frame.raw)?.type !== 'SYNC')
+        times.push(world.clock.now());
+      deliver(frame);
+    };
+    await world.clock.advance(60_000); // now at 260 s, a repeat is 15 s away
+    times.length = 0;
+
+    // The guest acknowledges the HELLO. That proves it is alive, so the host should speed up again.
+    const ackAt = world.clock.now();
+    const ack = new Sender(identityFromByte(2), ROOM);
+    ack.seq = guest.seq;
+    world.hub.inject(ROOM, 'guest', encodeMessage(ack.send({ type: 'SYNC', received: 0 })));
+    await world.clock.advance(14_000); // still before the old 275 s timer would have fired
+
+    // An immediate resend answers the SYNC, and the next one follows on the fast schedule.
+    expect(times[0]).toBe(ackAt);
+    expect(times[1]).toBe(ackAt + 3_000);
+  });
+
   it('a late friend still hears the host at once, not after a long backoff', async () => {
     const world = newWorld();
     const host = makePlayer(world, { name: 'host', role: 'host', secret: '1964', identityByte: 1 });
