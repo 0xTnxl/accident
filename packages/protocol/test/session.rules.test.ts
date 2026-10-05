@@ -96,6 +96,27 @@ describe('rules that keep the record honest', () => {
     expect(me.view.answers[0]).not.toBe(40);
   });
 
+  it('an opponent who guesses and answers their own guess in one breath is caught', async () => {
+    const { world, me, peer } = await vsPeer({
+      role: 'guest',
+      peer: { secret: '4271' },
+      auto: false,
+    });
+    await world.clock.advance(1_000);
+
+    // Both messages reach us together, before we have had a chance to answer the guess ourselves.
+    world.hub.hold = true;
+    await peer.guess('0123');
+    await peer.send({ type: 'ANSWER', index: 0, feedback: 40 }); // they answer their own guess
+    world.hub.hold = false;
+    world.hub.release();
+    await world.clock.advance(1_000);
+
+    expect(me.view.violations).toBe(1);
+    expect(me.view.answers).toHaveLength(1);
+    expect(me.view.answers[0]).not.toBe(40); // only our honest answer counts
+  });
+
   it('an early REVEAL does not enter the log, and a second one never replaces the first', async () => {
     const { world, me, peer } = await vsPeer({ peer: { secret: '4271' }, auto: false });
     await world.clock.advance(1_000);
@@ -295,6 +316,36 @@ describe('background work ends with the game', () => {
     const gaps = times.slice(1).map((t, i) => t - (times[i] as number));
     expect(gaps.slice(0, 4)).toEqual([6_000, 12_000, 24_000, 30_000]);
     expect(Math.max(...gaps)).toBe(30_000);
+  });
+
+  it('goes back to repeating quickly when the opponent is alive but its acknowledgements are lost', async () => {
+    const world = newWorld();
+    // Every SYNC is lost, so only accepted game messages show that the other side is alive.
+    world.hub.drop = (frame) => parseMessage(frame.raw)?.type === 'SYNC';
+    const host = makePlayer(world, { name: 'host', role: 'host', secret: '1964', identityByte: 1 });
+    const guest = makePlayer(world, {
+      name: 'guest',
+      role: 'guest',
+      secret: '4271',
+      identityByte: 2,
+    });
+    await host.session.start();
+    await guest.session.start();
+    autoplay(host, 'medium', 1);
+    autoplay(guest, 'medium', 2);
+
+    const times: number[] = [];
+    const deliver = world.hub.deliver.bind(world.hub);
+    world.hub.deliver = (frame) => {
+      if (frame.from === 'host') times.push(world.clock.now());
+      deliver(frame);
+    };
+    await until(world, () => host.session.view().guesses.length >= 8, 600_000, 50);
+    expect(host.session.view().guesses.length).toBeGreaterThanOrEqual(8);
+
+    // While the game is moving, no gap between the host's frames should have grown large.
+    const gaps = times.slice(1).map((t, i) => t - (times[i] as number));
+    expect(Math.max(...gaps)).toBeLessThanOrEqual(12_000);
   });
 
   it('a late friend still hears the host at once, not after a long backoff', async () => {
