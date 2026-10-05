@@ -49,7 +49,7 @@ Stack: pnpm workspaces, TypeScript strict, Vite, React, Tailwind, Vitest, `@sola
 ```ts
 // packages/protocol/src/ports.ts
 export interface Transport {
-  join(room: string, onMessage: (raw: string) => void, onStatus: (s: 'up'|'down') => void): Promise<void>;
+  join(room: string, handlers: { onMessage(raw: string): void; onStatus(status: 'up' | 'down'): void }): Promise<void>;
   send(room: string, raw: string): Promise<void>;
   leave(room: string): Promise<void>;
 }
@@ -133,6 +133,21 @@ any -> ABANDONED (cancel, vault lost)
 | FINAL | verdict computed | rematch or exit |
 
 Persisted after every transition and every message: state, secret, salt, outgoing messages, incoming transcript.
+
+### 4.1 Session (implemented in `packages/protocol/src/session.ts`)
+
+The state machine above is realised as an event-sourced `Session`:
+
+- **State is derived from a log** of accepted, signed messages from both players. A refresh reloads the log; there is no second copy of the state to disagree with it.
+- **Persist before transmit.** Every message is written to storage before it is sent, so a crash can never lead to a sequence number being reused for a different message (which would look like cheating). The secret and salt are saved before the commit Memo is sent, and an acknowledgement is only sent after what it acknowledges has been saved.
+- **One serial queue** for every mutation. Chain polling and timers run detached but apply their results through the queue.
+- **Acceptance rules.** A message is applied, held, ignored or counted as a violation. Guesses and answers are held until the play gate opens; a REVEAL is held until the game is over; anything out of turn, for the wrong index or from the wrong seat is a violation. A violation still consumes its sequence number so it is not resent forever.
+- **Delivery.** SYNC acknowledgements and resends. Repeats start at 3 s, double up to 30 s while nothing is heard, reset when the opponent proves alive, and stop a few attempts after the game is settled. A newly pinned opponent is told everything at once.
+- **Chain polling** starts at 250 ms and doubles to 2 s. It scans the opponent's address when a signature is missing or not found, and stops when the game is settled.
+- **Timers.** 90 s to open the play gate once the opponent has joined (a host waiting for a friend never times out); 180 s per move (UI only); 180 s reveal window.
+- **Errors.** A failed Memo is retried three times, then the session waits for `retry()` and shows a retryable error. Internal failures are reported in `view().error`, never swallowed.
+
+Known limit: both players compute the transcript hash at their own game end. If one side learned of the other's commit by scanning the chain and never received the COMMIT message, the hashes can differ. The verdict does not depend on the hash, so this is reported as a transcript dispute, not a fault.
 
 ## 5. Finalisation
 

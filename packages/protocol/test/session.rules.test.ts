@@ -96,6 +96,26 @@ describe('rules that keep the record honest', () => {
     expect(me.view.answers[0]).not.toBe(40);
   });
 
+  it('a COMMIT announcement that arrives after the commit was already found on-chain changes nothing', async () => {
+    // The opponent's commit is on-chain but was never announced, so the scan finds it first.
+    const { world, me, peer } = await vsPeer({
+      peer: { secret: '4271' },
+      commit: false,
+      auto: false,
+    });
+    await peer.postCommitOnly();
+    await world.clock.advance(20_000);
+    expect(me.view.peerCommit).toBe('verified');
+    expect(me.view.gateOpen).toBe(true);
+
+    // The announcement finally arrives. It is harmless: no violation, nothing replaced.
+    await peer.send({ type: 'COMMIT', txSig: peer.commitSig as string });
+    await world.clock.advance(2_000);
+    expect(me.view.violations).toBe(0);
+    expect(me.view.peerCommit).toBe('verified');
+    expect(me.view.phase).toBe('playing');
+  });
+
   it('an opponent who guesses and answers their own guess in one breath is caught', async () => {
     const { world, me, peer } = await vsPeer({
       role: 'guest',
@@ -365,6 +385,21 @@ describe('background work ends with the game', () => {
     );
     expect(host.session.view().answers.length).toBeGreaterThan(answered);
     expect(world.clock.now() - started).toBeLessThan(10_000);
+  });
+
+  it('a message that arrives while closing does not restart the timers', async () => {
+    const world = newWorld();
+    const host = makePlayer(world, { name: 'host', role: 'host', secret: '1964', identityByte: 1 });
+    await host.session.start();
+    await world.clock.advance(200_000); // backed off, so a reset has something to undo
+
+    await host.session.close();
+    const timersAfterClose = world.clock.pendingTimers;
+    // Reach the internal reset the way a message handled at the last moment would.
+    (host.session as unknown as { heardFromPeer(): void }).heardFromPeer();
+    expect(world.clock.pendingTimers).toBe(timersAfterClose);
+    await world.clock.advance(60_000);
+    expect(world.hub.frames.filter((f) => f.from === 'host').length).toBeLessThan(40);
   });
 
   it('retries quickly after its own connection comes back, even if nobody has answered', async () => {

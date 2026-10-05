@@ -13,6 +13,9 @@ The chain and the relay plug in later through small interfaces. Spec: `.kiro/spe
 | `messages.ts`   | Ed25519-signed relay messages with a strict payload grammar                 |
 | `transcript.ts` | Order-independent assembly of a signed game and its canonical SHA-256 hash  |
 | `finalise.ts`   | Deterministic verdict with evidence for every fault                         |
+| `session.ts`    | One player's whole game: log, play gate, auto-answer, reveal, verdict       |
+| `ports.ts`      | `Transport`, `Chain`, `Storage`, `Clock` interfaces                         |
+| `testing/`      | In-memory fakes with fault injection (drop, duplicate, reorder, slow chain) |
 
 ## Trust model in one paragraph
 
@@ -36,4 +39,4 @@ pnpm --filter @accident/protocol test:coverage   # enforces 100% coverage
 
 ## Not here yet
 
-The session state machine, the `Chain` adapter (web3.js), and the `Transport` adapter (relay).
+The real `Chain` adapter (web3.js on devnet) and `Transport` adapter (relay). Both implement the small interfaces in `ports.ts` and are tested against the same fakes.

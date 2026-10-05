@@ -45,17 +45,17 @@ Ordered to the PRD build plan, 4 to 12 October 2026. Each task lists the require
 ## Day 2: Tue 6 Oct, protocol and full game
 
 - [ ] 8. Messages and transport (REQ-10)
-  - [ ] 8.1 `signMessage`, `verifyMessage`, parsing (done); seq handling with buffering (session, not yet)
-  - [ ] 8.2 In-memory `Transport` and fake `Chain` for tests
+  - [x] 8.1 `signMessage`, `verifyMessage`, parsing, and sequence handling with buffering
+  - [x] 8.2 In-memory `Transport`, `Chain`, `Storage` and `Clock` for tests (`src/testing/`)
   - [ ] 8.3 Supabase Realtime `Transport` adapter
-  - [ ] 8.4 SYNC and resend timer; drop, duplicate and reorder tests
+  - [x] 8.4 SYNC and resend timer with backoff; drop, duplicate, reorder, disconnect and refresh tests
 - [ ] 9. Session state machine (REQ-4, REQ-9, REQ-11)
-  - [ ] 9.1 Room create and join, host/guest HELLO, pinning, link fragment
-  - [ ] 9.2 Commit, publish COMMIT, verify opponent commit, open the play gate
-  - [ ] 9.3 Auto-answer, guess turn flow, end rules, reveal Memo and REVEAL
+  - [x] 9.1 Host/guest HELLO and pinning, including the host key from the share link (the room code and link UI belong to the web app)
+  - [x] 9.2 Commit, publish COMMIT, verify the opponent commit (by signature, with address-scan fallback), open the play gate
+  - [x] 9.3 Auto-answer, guess turn flow, end rules, reveal Memo and REVEAL
 - [ ] 10. Finalisation (REQ-12, REQ-15.3)
   - [x] 10.1 Pure `finalise` and `transcriptHash` (plus `assembleTranscript`)
-  - [ ] 10.2 Attack tests (done: lying answer, false 40, hidden 40, invalid secret, forged signature, feedback 31, commit equivocation, missing reveal; still to do at session level: replayed or out-of-order seq, out-of-turn guess): lying answer, false 40, hidden 40, invalid secret, forged signature, replay or out-of-order, out-of-turn guess, feedback 31, commit equivocation, missing reveal (REQ-18.3)
+  - [x] 10.2 Attack tests (REQ-18.3): lying answer, false 40, hidden 40, invalid secret, forged signature, replay, out-of-order sequence, out-of-turn guess, feedback 31, commit equivocation, missing reveal
 - [ ] 11. House Bot (REQ-17), decision point
   - [ ] 11.1 Node bot using `protocol`; honest mode
   - [ ] 11.2 Cheating mode for the demo and tests

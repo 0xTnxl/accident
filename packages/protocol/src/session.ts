@@ -511,7 +511,8 @@ export class Session {
     if (this.resendStep === 0) return;
     // A timer armed during a long silence may be seconds away. Shorten it now.
     this.resendStep = 0;
-    if (this.started && !this.closed) this.armResend();
+    // Messages only arrive after start(), so only a closed session can skip this.
+    if (!this.closed) this.armResend();
   }
 
   private async onRelayStatus(status: RelayStatus): Promise<void> {
