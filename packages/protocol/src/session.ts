@@ -86,6 +86,11 @@ export interface SessionView {
   /** Our reveal Memo: not yet, posted, and the opponent's: not yet, announced, confirmed on-chain. */
   myReveal: 'none' | 'sent';
   peerReveal: 'none' | 'announced' | 'verified';
+  /** Transaction signatures of the Memo records, for linking to an explorer. */
+  records: {
+    mine: { commit: string | undefined; reveal: string | undefined };
+    peer: { commit: string | undefined; reveal: string | undefined };
+  };
   /** Guess codes by index (guess i is made by seat i % 2). */
   guesses: readonly Code[];
   /** Claimed feedback by index. */
@@ -280,6 +285,15 @@ export class Session {
     this.schedule();
   }
 
+  /**
+   * The signed messages of this game, as wire strings in the order they were accepted. Together with
+   * the two reveal Memos this is everything needed to check the game independently. It contains no
+   * secret before the reveals.
+   */
+  transcript(): string[] {
+    return [...this.s.log];
+  }
+
   subscribe(listener: (view: SessionView) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -305,6 +319,10 @@ export class Session {
       gateOpen,
       myReveal: s.myReveal ? 'sent' : 'none',
       peerReveal: this.peerRevealStatus(),
+      records: {
+        mine: { commit: s.myCommit?.sig, reveal: s.myReveal?.txSig },
+        peer: { commit: s.peerCommit?.sig, reveal: s.peerReveal?.txSig },
+      },
       guesses: d.guesses,
       answers: d.answers,
       status: d.status,

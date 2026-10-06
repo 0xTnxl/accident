@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Route } from '../src/lib/route.js';
 import { parseRoute, routePath, shareLink } from '../src/lib/route.js';
+import { withPlayer } from '../src/lib/useRoute.js';
 
 const KEY = '4Nd1mYQTqHVbSkJj8iKxw7rT3uCmEFs2bLqZx9wRKpAa';
 
@@ -91,5 +92,35 @@ describe('shareLink', () => {
     expect(link).toBe(`https://accident.example/r/ABC234#${KEY}`);
     expect(new URL(link).search).toBe('');
     expect(new URL(link).hash).toBe(`#${KEY}`);
+  });
+});
+
+describe('withPlayer', () => {
+  it('leaves a path alone when there is no player', () => {
+    expect(withPlayer('/friend', null)).toBe('/friend');
+    expect(withPlayer('/r/ABC234?host', '')).toBe('/r/ABC234?host');
+  });
+
+  it('adds the player to a plain path', () => {
+    expect(withPlayer('/friend', 'host')).toBe('/friend?as=host');
+  });
+
+  it('keeps an existing query and a fragment', () => {
+    const path = withPlayer('/r/ABC234?host', 'bob');
+    expect(path).toBe('/r/ABC234?host=&as=bob');
+    expect(withPlayer(`/r/ABC234#${KEY}`, 'bob')).toBe(`/r/ABC234?as=bob#${KEY}`);
+  });
+
+  it('replaces a player already present rather than doubling it', () => {
+    expect(withPlayer('/friend?as=old', 'new')).toBe('/friend?as=new');
+  });
+
+  it('produces URLs the router still understands', () => {
+    const url = new URL(withPlayer('/r/ABC234?host', 'alice'), 'https://x.test');
+    expect(parseRoute(url.pathname, url.search, url.hash)).toMatchObject({
+      name: 'room',
+      role: 'host',
+      code: 'ABC234',
+    });
   });
 });

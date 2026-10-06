@@ -483,3 +483,51 @@ describe('background work ends with the game', () => {
     expect(world.chain.calls.list).toBe(listed);
   });
 });
+
+describe('evidence the UI can show', () => {
+  it('reports the transaction signatures of both players’ commit and reveal Memos', async () => {
+    const { world, me, peer } = await vsPeer({ peer: { secret: '4271' } });
+    // Early on only the commit exists: the reveal Memo is posted when the game ends, not before.
+    expect(me.view.records.mine.commit).toBeDefined();
+    expect(me.view.records.mine.reveal).toBeUndefined();
+    expect(me.view.records.peer.reveal).toBeUndefined();
+    await until(world, () => isDone(me));
+
+    const mineOnChain = world.chain.txs.filter((t) => t.signer === me.identity.publicKey);
+    const peerOnChain = world.chain.txs.filter((t) => t.signer === peer.key);
+    const sigOf = (txs: typeof mineOnChain, kind: 'C' | 'R'): string | undefined =>
+      txs.find((t) => t.text.split('|')[2] === kind)?.sig;
+
+    expect(me.view.records.mine.commit).toBe(sigOf(mineOnChain, 'C'));
+    expect(me.view.records.mine.reveal).toBe(sigOf(mineOnChain, 'R'));
+    expect(me.view.records.peer.commit).toBe(sigOf(peerOnChain, 'C'));
+    expect(me.view.records.peer.reveal).toBe(sigOf(peerOnChain, 'R'));
+    for (const sig of Object.values({ ...me.view.records.mine, ...me.view.records.peer })) {
+      expect(sig).toMatch(/^[1-9A-HJ-NP-Za-km-z]{64,90}$/);
+    }
+  });
+
+  it('exports the signed transcript, and it holds no secret before the reveals', async () => {
+    const { world, me } = await vsPeer({ peer: { secret: '4271' }, auto: false });
+    await world.clock.advance(1_000);
+    await me.session.submitGuess('0123');
+    await world.clock.advance(1_000);
+    const exported = me.session.transcript();
+    const types = exported.map((line) => (JSON.parse(line) as { type: string }).type);
+    // Both HELLOs and COMMITs, our guess, their answer, then their own guess and our answer to it.
+    expect(types.slice(0, 6)).toEqual(['HELLO', 'HELLO', 'COMMIT', 'COMMIT', 'GUESS', 'ANSWER']);
+    expect(types.filter((t) => t === 'REVEAL')).toEqual([]);
+    expect(exported.join('')).not.toContain(me.secret);
+    // Each line is a complete, verifiable wire message.
+    for (const line of exported) expect(parseMessage(line)).toBeDefined();
+  });
+
+  it('hands out a copy, so a caller cannot alter the log', async () => {
+    const world = newWorld();
+    const p = makePlayer(world, { name: 'p', role: 'host', secret: '1964', identityByte: 1 });
+    await p.session.start();
+    const copy = p.session.transcript();
+    copy.length = 0;
+    expect(p.session.transcript()).toHaveLength(1);
+  });
+});

@@ -1,12 +1,28 @@
 import type { ReactNode } from 'react';
+import { Suspense, lazy } from 'react';
 import { useRoute } from './lib/useRoute.js';
-import { FriendRoot } from './friend/FriendRoot.js';
 import { Home } from './screens/Home.js';
 import { How } from './screens/How.js';
 import { Practice } from './screens/Practice.js';
 import { Stats } from './screens/Stats.js';
 import { Button } from './ui/Button.js';
 import { Shell } from './ui/Shell.js';
+
+// Friend mode pulls in the Solana client, the relay client and the QR encoder. Loading them only
+// when a player opens it keeps the first screen, and the offline computer game, small and quick.
+const FriendRoot = lazy(() =>
+  import('./friend/FriendRoot.js').then((m) => ({ default: m.FriendRoot })),
+);
+
+function Loading() {
+  return (
+    <Shell title="Play a friend">
+      <p className="py-6 text-ink-soft" role="status">
+        Loading…
+      </p>
+    </Shell>
+  );
+}
 
 export function App(): ReactNode {
   const [route, go] = useRoute();
@@ -30,7 +46,11 @@ export function App(): ReactNode {
       return <Practice onBack={home} />;
     case 'friend':
     case 'room':
-      return <FriendRoot route={route} go={go} />;
+      return (
+        <Suspense fallback={<Loading />}>
+          <FriendRoot route={route} go={go} />
+        </Suspense>
+      );
     case 'notfound':
       return (
         <Shell title="Not found" onBack={home}>

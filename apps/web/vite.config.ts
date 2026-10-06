@@ -46,7 +46,11 @@ export default defineConfig({
   plugins: [react(), tailwindcss(), precacheServiceWorker()],
   build: { target: 'es2022', sourcemap: true },
   test: {
-    environment: 'jsdom',
+    // Logic tests run in plain Node. Under jsdom the TextEncoder and Uint8Array come from
+    // different realms, and tweetnacl (correctly) refuses bytes that are not instances of the
+    // Uint8Array it can see. Real browsers have a single realm, so this is a test-only problem.
+    // A test that renders components opts in to a DOM with `// @vitest-environment jsdom`.
+    environment: 'node',
     setupFiles: ['./test/setup.ts'],
     include: ['test/**/*.test.{ts,tsx}'],
     css: false,

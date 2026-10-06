@@ -1,9 +1,16 @@
+import type { ReactNode } from 'react';
 import { useState } from 'react';
+import { CheckIcon, CrossIcon, QuestionIcon } from './Icons.js';
 
 type Mark = '' | 'yes' | 'no' | 'maybe';
 
 const NEXT: Record<Mark, Mark> = { '': 'no', no: 'yes', yes: 'maybe', maybe: '' };
-const SYMBOL: Record<Mark, string> = { '': '', no: '✕', yes: '✓', maybe: '?' };
+const SYMBOL: Record<Mark, ReactNode> = {
+  '': null,
+  no: <CrossIcon className="size-3" />,
+  yes: <CheckIcon className="size-3" />,
+  maybe: <QuestionIcon className="size-3" />,
+};
 const LABEL: Record<Mark, string> = {
   '': 'unmarked',
   no: 'ruled out',
@@ -44,7 +51,7 @@ export function Notepad() {
               }`}
             >
               <span className={mark === 'no' ? 'line-through' : ''}>{digit}</span>
-              <span className="h-3 text-xs font-bold">{SYMBOL[mark]}</span>
+              <span className="grid h-3 place-items-center">{SYMBOL[mark]}</span>
             </button>
           );
         })}
