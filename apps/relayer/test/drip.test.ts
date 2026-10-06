@@ -219,6 +219,20 @@ describe('limits that protect the wallet', () => {
     expect(counter.peek('ip:1.1.1.1', dayOf(NOW))).toBe(1);
   });
 
+  it('a refused repeat for one key does not use up the network’s allowance for other players', async () => {
+    // A household on one network: one person keeps pressing retry after already being funded.
+    const { deps, counter, treasury } = setup({ perIpPerDay: 3 });
+    const pubkey = key();
+    await handleDrip(post({ pubkey }), deps);
+    for (let i = 0; i < 5; i++) expect((await handleDrip(post({ pubkey }), deps)).status).toBe(429);
+    expect(counter.peek('ip:1.1.1.1', dayOf(NOW))).toBe(1);
+    expect(counter.peek(`key:${pubkey}`, dayOf(NOW))).toBe(1);
+    // Others on the same network are still served.
+    expect((await handleDrip(post({ pubkey: key() }), deps)).status).toBe(200);
+    expect((await handleDrip(post({ pubkey: key() }), deps)).status).toBe(200);
+    expect(treasury.sent).toHaveLength(3);
+  });
+
   it('reports a chain outage when it cannot read the balance', async () => {
     const { deps, treasury } = setup();
     treasury.failBalance = true;
