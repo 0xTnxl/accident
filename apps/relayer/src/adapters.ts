@@ -1,4 +1,5 @@
-import { Connection, Keypair, PublicKey, SystemProgram, Transaction } from '@solana/web3.js';
+import type { Connection } from '@solana/web3.js';
+import { Keypair, PublicKey, SystemProgram, Transaction } from '@solana/web3.js';
 import type { Treasury } from './drip.js';
 import type { EventRecord } from './event.js';
 import type { Counter } from './http.js';
