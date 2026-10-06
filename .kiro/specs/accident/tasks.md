@@ -70,9 +70,9 @@ Ordered to the PRD build plan, 4 to 12 October 2026. Each task lists the require
   - [x] 12.2 180 s countdown, timeout claim, forfeit offer
   - [x] 12.3 Result screen with Memo links; transcript export; rematch with new room
 - [ ] 13. Resilience (REQ-14)
-  - [ ] 13.1 Wake lock, hidden-tab warning, resume from vault
+  - [x] 13.1 Wake lock (re-acquires on return to foreground), hidden-tab warning, resume from vault (resume via the controller). Not yet checked on a real phone.
   - [x] 13.2 Retry UI for Memo failures; plain-language errors
-- [ ] 14. Analytics wiring (REQ-16)
+- [x] 14. Analytics wiring (REQ-16): POST /api/event (relayer) plus the web client (`app_open`, `cpu_game_*`, `room_*`, `play_gate_open`, `pvp_*`, `tx_error`). A round-trip test checks every client event against the real handler. Not yet sent to a live analytics backend.
 - [ ] 15. Device matrix and resilience tests: refresh mid-game, background 60 s, airplane blip, clear storage
 - [ ] 16. Verifier page (REQ-15.4), decision point: build if 1 to 15 are green, otherwise defer to Friday
 
