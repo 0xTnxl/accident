@@ -14,9 +14,9 @@ Ordered to the PRD build plan, 4 to 12 October 2026. Each task lists the require
   - [x] 2.3 Strategies: easy, medium, hard (minimax, sum of squares tie-break, opener 0123)
   - [x] 2.4 Tests: A.1 vectors, symmetry, 5,040 codes, candidate filtering, strategy averages (REQ-18.4)
 - [ ] 3. Web app shell and practice mode (REQ-1, REQ-2)
-  - [ ] 3.1 Vite + React + Tailwind + Zustand app, PWA manifest and service worker
-  - [ ] 3.2 Home, How to play (1964 / 2604 example), keypad, pick secret, practice board
-  - [ ] 3.3 Web Worker for the computer; difficulty selector
+  - [x] 3.1 Vite + React + Tailwind + Zustand app, PWA manifest and service worker (Zustand was not needed: state is a reducer plus a controller)
+  - [x] 3.2 Home, How to play (1964 / 2604 example), keypad, pick secret, practice board
+  - [x] 3.3 Web Worker for the computer; difficulty selector
   - [ ] 3.4 Deploy to Vercel; one person finishes a practice game on a phone
 - [ ] 4. Day-1 checks (design section 12)
   - [ ] 4.1 Confirm Colosseum deadline, fields, and any custom-program requirement
@@ -66,12 +66,12 @@ Ordered to the PRD build plan, 4 to 12 October 2026. Each task lists the require
 ## Day 3: Wed 7 Oct, UX, resilience, go or no-go
 
 - [ ] 12. Friend board and result (REQ-11.3, REQ-15, REQ-13)
-  - [ ] 12.1 Create room, join room, friend board with status chips
-  - [ ] 12.2 180 s countdown, timeout claim, forfeit offer
-  - [ ] 12.3 Result screen with Memo links; transcript export; rematch with new room
+  - [x] 12.1 Create room, join room, friend board with status chips
+  - [x] 12.2 180 s countdown, timeout claim, forfeit offer
+  - [x] 12.3 Result screen with Memo links; transcript export; rematch with new room
 - [ ] 13. Resilience (REQ-14)
   - [ ] 13.1 Wake lock, hidden-tab warning, resume from vault
-  - [ ] 13.2 Retry UI for Memo failures; plain-language errors
+  - [x] 13.2 Retry UI for Memo failures; plain-language errors
 - [ ] 14. Analytics wiring (REQ-16)
 - [ ] 15. Device matrix and resilience tests: refresh mid-game, background 60 s, airplane blip, clear storage
 - [ ] 16. Verifier page (REQ-15.4), decision point: build if 1 to 15 are green, otherwise defer to Friday
