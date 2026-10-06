@@ -6,11 +6,14 @@ import { Shell } from '../ui/Shell.js';
 import type { Backend } from './backend.js';
 import { createBackend } from './backend.js';
 import type { Choice, SetupState } from './controller.js';
+import { Analytics, noopAnalytics } from './analytics.js';
 import { readEnv } from './env.js';
 import { Lobby } from './Lobby.js';
 import { controllerFor, leaveRoom } from './registry.js';
 import { Room } from './Room.js';
 import { loadOrCreateIdentity } from './vault.js';
+import { useGameEffects } from './useGameEffects.js';
+import { WakeLock, browserWakeLockEnv } from './wakeLock.js';
 import type { SessionView } from '@accident/protocol';
 
 interface FriendRootProps {
@@ -20,6 +23,16 @@ interface FriendRootProps {
 
 /** One backend per page load. Built lazily so a missing configuration is reported, not thrown. */
 let cached: { backend: Backend } | { error: string } | undefined;
+
+/** One analytics object and one wake lock for the page. Disabled analytics in the simulation build. */
+let shared: { analytics: Analytics; wakeLock: WakeLock } | undefined;
+function sharedServices(kind: 'live' | 'sim'): { analytics: Analytics; wakeLock: WakeLock } {
+  shared ??= {
+    analytics: kind === 'sim' ? noopAnalytics : new Analytics(),
+    wakeLock: new WakeLock(browserWakeLockEnv()),
+  };
+  return shared;
+}
 
 function backend(): { backend: Backend } | { error: string } {
   if (!cached) {
@@ -35,6 +48,7 @@ function backend(): { backend: Backend } | { error: string } {
 /** Test hook: forget the cached backend. */
 export function resetBackend(): void {
   cached = undefined;
+  shared = undefined;
 }
 
 export function FriendRoot({ route, go }: FriendRootProps) {
@@ -112,6 +126,9 @@ function ActiveRoom({
   const [view, setView] = useState<SessionView | undefined>(() => controller.view());
   const [setup, setSetup] = useState<SetupState>(() => controller.state());
   const [resuming, setResuming] = useState(controller.view() === undefined);
+
+  const { analytics, wakeLock } = sharedServices(be.kind);
+  useGameEffects(view, { wakeLock, analytics, role: route.role });
 
   useEffect(() => {
     const offView = controller.onView(setView);

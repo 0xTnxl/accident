@@ -14,6 +14,7 @@ import {
   resultOf,
   turnOf,
 } from '../practice/game.js';
+import { analytics } from '../lib/analytics.js';
 import { loadStats, recordGame, saveStats } from '../lib/stats.js';
 import { Board } from '../ui/Board.js';
 import { Button } from '../ui/Button.js';
@@ -139,7 +140,9 @@ export function Practice({
   useEffect(() => {
     if (!game || !result || recorded.current === game) return;
     recorded.current = game;
-    saveStats(recordGame(loadStats(), game.level, result, playerRows(game).length));
+    const guesses = playerRows(game).length;
+    saveStats(recordGame(loadStats(), game.level, result, guesses));
+    analytics().send({ name: 'cpu_game_end', level: game.level, result, guesses });
   }, [game, result]);
 
   const begin = useCallback(
@@ -147,6 +150,7 @@ export function Practice({
       dispatch({ type: 'start', game: newPracticeGame(level, secret, rng ?? secureRng()) });
       setTab('mine');
       setAnnouncement('');
+      analytics().send({ name: 'cpu_game_start', level });
     },
     [level, rng],
   );

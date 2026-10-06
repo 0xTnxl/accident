@@ -1,6 +1,7 @@
 import { decodeFeedback } from '@accident/engine';
 import type { Fault, SessionView } from '@accident/protocol';
 import { useEffect, useState } from 'react';
+import { useHidden } from '../lib/useHidden.js';
 import { shareLink } from '../lib/route.js';
 import { Board } from '../ui/Board.js';
 import { CheckIcon } from '../ui/Icons.js';
@@ -314,6 +315,7 @@ function Playing(props: RoomProps & { view: SessionView }) {
       right={<RelayDot relay={view.relay} />}
     >
       {backend.kind === 'sim' ? <SimulationBanner /> : null}
+      <HiddenWarning />
       <div
         role="tablist"
         aria-label="Guesses"
@@ -389,6 +391,20 @@ function Playing(props: RoomProps & { view: SessionView }) {
         />
       </div>
     </Shell>
+  );
+}
+
+function HiddenWarning() {
+  const hidden = useHidden();
+  if (!hidden) return null;
+  return (
+    <p
+      role="alert"
+      data-testid="hidden-warning"
+      className="mb-2 rounded-xl border-2 border-dead bg-dead/5 p-2 text-center text-sm font-semibold text-dead"
+    >
+      Keep this tab open: your phone must stay awake to answer your friend.
+    </p>
   );
 }
 

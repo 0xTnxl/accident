@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
+import { analytics } from './lib/analytics.js';
 import { useRoute } from './lib/useRoute.js';
 import { Home } from './screens/Home.js';
 import { How } from './screens/How.js';
@@ -26,6 +27,7 @@ function Loading() {
 
 export function App(): ReactNode {
   const [route, go] = useRoute();
+  useEffect(() => analytics().send({ name: 'app_open' }), []);
   const home = (): void => go({ name: 'home' });
 
   switch (route.name) {
