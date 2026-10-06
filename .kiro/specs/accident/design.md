@@ -201,7 +201,20 @@ Input: two reveal tx signatures plus a transcript file. Steps: fetch both reveal
 | Reveal | `ACC1\|<room>\|R\|<secret>\|<64 hex salt>\|<64 hex transcript hash>` | 148 **[Proposed]** |
 | Reveal (v1.1 form, accepted for compatibility) | `ACC1\|<room>\|R\|<secret>\|<64 hex salt>` | 83 |
 
-Memo program ID: Memo v2 `MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr` **[Verify with a devnet transaction before relying on it]**. The signer is listed as a signer account on the instruction.
+Memo program ID: Memo v2 `MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr`. The signer is listed as a signer account on the instruction, so the program verifies the signature and logs `Signed by <key>`.
+
+**Measured on devnet (task 4.2), by simulating the exact transaction the game sends** (`packages/solana/devnet-simulate.result.json`, reproduce with `pnpm --filter @accident/solana devnet-simulate`):
+
+| Record | Memo bytes | Transaction bytes | Compute units | Result |
+| --- | --- | --- | --- | --- |
+| Commit | 78 | 248 | 42,841 | succeeds, memo echoed in the log |
+| Reveal (v1.1) | 83 | 253 | 44,458 | succeeds |
+| Reveal with transcript hash | 148 | 319 | 67,277 | succeeds |
+
+- **The longest signed Memo that works is 526 bytes** (527 fails with `ProgramFailedToComplete`). The documented 566 bytes applies to an unsigned instruction. With a signer attached the program runs out of its default 200,000 compute units first. Our largest record is 148 bytes, so there are more than three times that to spare.
+- **The fee is 5,000 lamports per transaction**, so a four-Memo game costs 0.00002 SOL and a 0.01 SOL drip covers about 500 transactions.
+- The real program exists on devnet as an executable account, and real Memo transactions from other programs read back correctly through the adapter, including Memos mixed with ComputeBudget and token instructions.
+- **Not yet done:** actually submitting a Memo. The public devnet faucet returned 429 ("airdrop limit reached or faucet dry") for this sandbox, so there was no SOL to pay the fee. `pnpm --filter @accident/solana devnet-check` does the full send, read-back and address-scan round trip once a funded key is available (set `DEVNET_FUNDED_SECRET_KEY`, or try again after the faucet limit resets).
 
 The chain adapter sends at `confirmed` commitment. Lookup polls `getTransaction` with backoff (250 ms up to 2 s), with a 20 s ceiling before the `getSignaturesForAddress` fallback.
 
@@ -256,6 +269,6 @@ Engine strategies exactly as PRD section 7. The Worker receives `{level, history
 1. Relay provider: Supabase Realtime **[Default]** or Cloudflare-based. Decide after a latency check from Nigeria.
 2. Hosting: Vercel **[Default]**.
 3. Licence: MIT **[Default]**.
-4. Memo program ID and signer behaviour confirmed by a real devnet transaction.
+4. ~~Memo program ID and signer behaviour~~ confirmed by devnet simulation. A real submitted transaction is still to do (faucet rate-limited).
 5. Colosseum deadline and any on-chain program requirement.
 6. Test phones.

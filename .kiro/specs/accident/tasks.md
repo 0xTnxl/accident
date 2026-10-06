@@ -20,7 +20,7 @@ Ordered to the PRD build plan, 4 to 12 October 2026. Each task lists the require
   - [ ] 3.4 Deploy to Vercel; one person finishes a practice game on a phone
 - [ ] 4. Day-1 checks (design section 12)
   - [ ] 4.1 Confirm Colosseum deadline, fields, and any custom-program requirement
-  - [ ] 4.2 Send one Memo on devnet; confirm program ID, signer handling and `getTransaction` shape
+  - [~] 4.2 Program ID, signer handling, sizes and the 526-byte limit confirmed on devnet by simulation, and read-back checked against real Memo transactions. Still to do: submit one real Memo (the public faucet returned 429)
   - [ ] 4.3 Latency and limits check for Supabase Realtime from Nigeria; decide relay
 
 **Exit:** a friend finishes a practice game on the live URL; checks recorded in the README.
@@ -30,7 +30,7 @@ Ordered to the PRD build plan, 4 to 12 October 2026. Each task lists the require
 - [ ] 5. Commitment and Memo helpers in `protocol` (REQ-7, REQ-8)
   - [x] 5.1 `commitment()`; A.2 vector in Node; four negative tests
   - [x] 5.2 `encodeCommitMemo`, `encodeRevealMemo`, strict `parseMemo` (both reveal forms)
-  - [ ] 5.3 `Chain` adapter on web3.js v1: `sendMemo`, `getMemoTx`, `listMemoTxs`, retry and backoff
+  - [x] 5.3 `Chain` adapter on web3.js v1 (`packages/solana`): `sendMemo`, `getMemoTx`, `listMemoTxs`. Retry and backoff live in the session
   - [x] 5.4 Memo tests: wrong signer, text or room rejected; first-wins canonical selection (pure selection logic done; fetching by signature belongs to 5.3)
 - [ ] 6. Vault and keys (REQ-5)
   - [ ] 6.1 Burner keypair, localStorage plus IndexedDB, `storage.persist()`

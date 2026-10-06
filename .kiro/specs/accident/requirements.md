@@ -93,7 +93,7 @@ Items marked **[Proposed]** are additions to v1.1 that need owner sign-off. Item
 
 1. THE Client SHALL send the commit as a Memo transaction signed by the burner key: `ACC1|<room>|C|<64 hex>`.
 2. THE Client SHALL send the reveal as a Memo transaction: `ACC1|<room>|R|<secret>|<64 hex salt>`, with the **[Proposed]** transcript anchor `|<64 hex transcript hash>` appended (REQ-15).
-3. THE Client SHALL parse Memo text strictly and reject any deviation.
+3. THE Client SHALL parse Memo text strictly and reject any deviation. A Memo only counts if the transaction succeeded, the instruction belongs to the Memo v2 program, it is the only Memo in the transaction, and the signer is the fee payer.
 4. WHEN fetching an opponent record by signature, THE Client SHALL check that the transaction succeeded, the signer equals the opponent key, the Memo text matches and the room matches, and SHALL read the block time.
 5. **[Proposed]** FOR each (room, key), THE earliest-landed commit Memo SHALL be canonical. A later, different commit Memo from the same key SHALL be treated as equivocation and a fault. The same first-wins rule SHALL apply to reveal Memos.
 6. THE Client SHALL retry a failed Memo send up to 3 times, then show a clear message and a retry button.
