@@ -8,3 +8,8 @@ coverage/
 .DS_Store
 .vercel/
 .turbo/
+
+# Playwright output
+test-results/
+playwright-report/
+dist-sim/
