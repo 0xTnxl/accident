@@ -1,6 +1,13 @@
-import type { Code, Level, Rng, Turn } from '@accident/engine';
-import { candidatesFromHistory, chooseGuess, OPENING_GUESS, secureRng } from '@accident/engine';
+import type { Code, Feedback, Level, Rng, Turn } from '@accident/engine';
+import {
+  candidatesFromHistory,
+  chooseGuess,
+  OPENING_GUESS,
+  secureRng,
+  VALID_FEEDBACK,
+} from '@accident/engine';
 import type {
+  AnswerPolicy,
   Chain,
   Clock,
   Identity,
@@ -13,6 +20,49 @@ import type {
 import { Session } from '@accident/protocol';
 import type { Choice } from './secret.js';
 import { makeChoice } from './secret.js';
+
+/**
+ * The label a House Bot carries so a room or opponent can tell it apart from a human (REQ-17.3).
+ * The relay HELLO payload is fixed to 'host' | 'guest' and must not be weakened to carry this, so
+ * the badge lives at the bot layer instead: see {@link HouseBot.label} and {@link HouseBot.marker}.
+ */
+export const HOUSE_BOT_LABEL = 'House Bot';
+
+/**
+ * A room-facing marker a UI renders as the "bot" badge (REQ-17.3). It pairs the bot's public key
+ * (how the opponent already identifies the seat, from the signed messages) with the label, so a
+ * room can match the badge to the player without any change to protocol message validation.
+ */
+export interface BotMarker {
+  label: string;
+  publicKey: string;
+}
+
+/**
+ * How a bot deviates from honest answering, used to demonstrate and test lie detection (Task 11.2 /
+ * REQ-17.2). The bot lies about exactly one of its own answers, at the given 0-based ANSWER index,
+ * sending a feedback that differs from the true score but is still a valid {@link Feedback}. Every
+ * other answer stays honest. With no cheat option the bot plays the honest path unchanged.
+ */
+export interface CheatConfig {
+  /** The ANSWER index this bot lies about. */
+  atGuessIndex: number;
+}
+
+/**
+ * Builds an {@link AnswerPolicy} that lies on exactly one index. For the targeted index it returns
+ * the first valid feedback that is not the honest score, so the ANSWER is syntactically valid yet
+ * provably wrong; every other index is answered honestly. Finalisation re-scores each answer and
+ * charges the lying seat a 'wrong-answer' fault, so the honest opponent wins.
+ */
+function cheatingPolicy(cheat: CheatConfig): AnswerPolicy {
+  return ({ index, honest }): Feedback => {
+    if (index !== cheat.atGuessIndex) return honest;
+    const wrong = VALID_FEEDBACK.find((value) => value !== honest);
+    // VALID_FEEDBACK has 14 entries, so one that differs from the honest value always exists.
+    return wrong as Feedback;
+  };
+}
 
 /**
  * Picks an honest guess from a view, exactly as the proven harness `autoplay` does: keep only the
@@ -50,6 +100,13 @@ export interface HouseBotConfig {
   level?: Level;
   /** Source of randomness for guess selection. Default {@link secureRng}; tests inject a seed. */
   rng?: Rng;
+  /**
+   * Makes the bot lie about one answer, to demonstrate lie detection (Task 11.2). Omit for honest
+   * play, which is byte-for-byte identical to a bot with no cheat option.
+   */
+  cheat?: CheatConfig;
+  /** A custom label for the room badge. Defaults to {@link HOUSE_BOT_LABEL}. */
+  label?: string;
   transport: Transport;
   chain: Chain;
   storage: Storage;
@@ -67,6 +124,10 @@ export class HouseBot {
   private readonly session: Session;
   private readonly level: Level;
   private readonly rng: Rng;
+  /** The bot's own public key, how the opponent identifies this seat in the signed messages. */
+  private readonly publicKey: string;
+  /** How a room should badge this player as a bot (REQ-17.3). */
+  readonly label: string;
   /** The length of `guesses` at the last submission, so each turn is answered once. */
   private submitted = -1;
   private unsubscribe: (() => void) | undefined;
@@ -77,6 +138,8 @@ export class HouseBot {
     const choice = config.choice ?? makeChoice(config.rng);
     this.level = config.level ?? 'medium';
     this.rng = config.rng ?? secureRng();
+    this.label = config.label ?? HOUSE_BOT_LABEL;
+    this.publicKey = config.identity.publicKey;
     this.session = Session.create({
       room: config.room,
       role: config.role,
@@ -89,7 +152,19 @@ export class HouseBot {
       storage: config.storage,
       clock: config.clock,
       options: config.options ?? {},
+      // Honest by default: with no cheat option no answerPolicy is passed, so the Session answers
+      // every guess with the true score, exactly as an honest Client does.
+      ...(config.cheat === undefined ? {} : { answerPolicy: cheatingPolicy(config.cheat) }),
     });
+  }
+
+  /**
+   * The room-facing marker a UI uses to render the "bot" badge (REQ-17.3). It carries the label and
+   * the bot's public key, which the opponent already learns from the signed messages, so the badge
+   * can be matched to the seat without touching protocol message validation.
+   */
+  marker(): BotMarker {
+    return { label: this.label, publicKey: this.publicKey };
   }
 
   /** Joins the room and begins playing. Guesses are made automatically as turns come up. */

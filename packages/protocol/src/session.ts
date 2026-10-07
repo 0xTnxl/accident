@@ -109,6 +109,20 @@ export interface SessionView {
   violations: number;
 }
 
+/**
+ * Chooses the feedback a seat sends for one guess. Called in {@link Session} with the honest score
+ * already computed; its return value is used as the ANSWER feedback. Only {@link Session.create}
+ * callers who want to deviate from honest play (such as the cheating House Bot used to demonstrate
+ * lie detection) supply one; when omitted the honest score is sent unchanged. The returned value
+ * must still be a valid {@link Feedback}: the ANSWER encoder rejects anything else.
+ */
+export type AnswerPolicy = (ctx: {
+  index: number;
+  guess: Code;
+  secret: Code;
+  honest: Feedback;
+}) => Feedback;
+
 export interface SessionConfig {
   room: string;
   role: Role;
@@ -123,6 +137,11 @@ export interface SessionConfig {
   storage: Storage;
   clock: Clock;
   options?: Partial<SessionOptions>;
+  /**
+   * Optional override for the feedback this seat sends. Additive and off by default: with no
+   * policy the Session answers honestly, exactly as before. See {@link AnswerPolicy}.
+   */
+  answerPolicy?: AnswerPolicy;
 }
 
 export type ResumeConfig = Pick<
@@ -218,6 +237,9 @@ export class Session {
     verdict: false,
   };
 
+  /** How this seat chooses its answers. Honest when undefined. */
+  private readonly answerPolicy: AnswerPolicy | undefined;
+
   private constructor(
     private readonly config: Pick<
       SessionConfig,
@@ -225,10 +247,12 @@ export class Session {
     >,
     state: State,
     options?: Partial<SessionOptions>,
+    answerPolicy?: AnswerPolicy,
   ) {
     this.s = state;
     this.me = state.role === 'host' ? 0 : 1;
     this.options = { ...DEFAULT_OPTIONS, ...options };
+    this.answerPolicy = answerPolicy;
   }
 
   /** Starts a new game. Call {@link start} to begin. */
@@ -250,7 +274,7 @@ export class Session {
       createdAt: config.clock.now(),
     };
     if (config.hostKey !== undefined) state.hostKey = config.hostKey;
-    return new Session(config, state, config.options);
+    return new Session(config, state, config.options, config.answerPolicy);
   }
 
   /**
@@ -744,11 +768,14 @@ export class Session {
       !d.status.over
     ) {
       const index = d.answers.length;
-      await this.sendBody({
-        type: 'ANSWER',
-        index,
-        feedback: score(s.secret, d.guesses[index] as Code),
-      });
+      const guess = d.guesses[index] as Code;
+      const honest = score(s.secret, guess);
+      // Honest by default. An answerPolicy (used only to demonstrate lie detection) may return a
+      // different feedback; the ANSWER encoder still enforces that it is a valid Feedback.
+      const feedback = this.answerPolicy
+        ? this.answerPolicy({ index, guess, secret: s.secret, honest })
+        : honest;
+      await this.sendBody({ type: 'ANSWER', index, feedback });
       changed = true;
     }
 
