@@ -14,7 +14,9 @@ import {
   isValidRoom,
   parseMemo,
   selectCommit,
+  selectReveal,
   toChainCommit,
+  toChainReveal,
   transcriptHash,
 } from '@accident/protocol';
 
@@ -108,21 +110,17 @@ export async function verifyGame(
     commitSigs[seat] = resolved.sig;
   }
 
-  // (5) Build each seat's reveal from the fetched Memo. The verifier is given one reveal per seat,
-  // so there is no conflict to flag; the signer comes from the fetched transaction so finalise's
-  // reveal-signer-mismatch check is meaningful.
+  // (5) Resolve the canonical reveal per seat via the earliest-reveal on-chain rule, the same way
+  // session.ts does, so `conflicting` reflects what is on-chain (D1: the first reveal per (room,
+  // key) is canonical, a differing second is a fault). The user-supplied signature only locates
+  // the reveal when the address scan is empty; the signer and secret always come from the
+  // canonical record so finalise's reveal-signer-mismatch and commitment checks stay meaningful.
   const reveals: [ChainReveal | undefined, ChainReveal | undefined] = [undefined, undefined];
   const revealSigs: [string | undefined, string | undefined] = [undefined, undefined];
   for (const seat of SEATS) {
-    const got = fetched[seat];
-    if (!got) continue;
-    reveals[seat] = {
-      secret: got.memo.secret,
-      salt: got.memo.salt,
-      signer: got.tx.signer,
-      conflicting: false,
-    };
-    revealSigs[seat] = got.tx.sig;
+    const resolved = await resolveReveal(chain, transcript, seat, fetched[seat]);
+    reveals[seat] = resolved.reveal;
+    revealSigs[seat] = resolved.sig;
   }
 
   // (6) Compare the transcript hash to the `T` field each reveal Memo carried. A mismatch is a
@@ -150,6 +148,45 @@ export async function verifyGame(
     revealSigs,
     hashCheck,
     ignored: transcript.ignored,
+  };
+}
+
+/**
+ * Resolves the reveal that counts for a seat. Prefers the earliest-reveal on-chain rule by
+ * scanning the player's address (so `conflicting` reflects reveal equivocation, mirroring the
+ * commit side and the in-game session.ts path); falls back to the reveal the user's signature
+ * pointed at when the address scan comes up empty. The signer always comes from the resolved
+ * transaction so finalise's reveal-signer-mismatch check stays meaningful.
+ */
+async function resolveReveal(
+  chain: Chain,
+  transcript: Transcript,
+  seat: 0 | 1,
+  fetched: FetchedReveal | undefined,
+): Promise<{ reveal: ChainReveal | undefined; sig: string | undefined }> {
+  const address = transcript.players[seat];
+  let scanned: readonly MemoTx[];
+  try {
+    scanned = await chain.listMemoTxs(address, transcript.room);
+  } catch {
+    scanned = [];
+  }
+  const canonical = selectReveal(scanned, transcript.room, address);
+  if (canonical) {
+    return { reveal: toChainReveal(canonical), sig: canonical.tx.sig };
+  }
+
+  // The scan found nothing on-chain for this seat. Fall back to the reveal the user's signature
+  // located, if any, treating a lone record as non-conflicting.
+  if (!fetched) return { reveal: undefined, sig: undefined };
+  return {
+    reveal: {
+      secret: fetched.memo.secret,
+      salt: fetched.memo.salt,
+      signer: fetched.tx.signer,
+      conflicting: false,
+    },
+    sig: fetched.tx.sig,
   };
 }
 

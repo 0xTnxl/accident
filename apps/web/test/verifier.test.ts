@@ -1,9 +1,10 @@
 import { createHash, webcrypto } from 'node:crypto';
 import type { Code, Feedback } from '@accident/engine';
 import { score } from '@accident/engine';
-import type { Body, Identity, SignedMessage } from '@accident/protocol';
+import type { Body, Chain, Identity, SignedMessage } from '@accident/protocol';
 import {
   commitment,
+  decodeBody,
   encodeCommitMemo,
   encodeRevealMemo,
   generateIdentity,
@@ -354,4 +355,75 @@ describe('verifyGame', () => {
     expect(result.revealSigs[0]).toBeUndefined();
     expect(result.verdict.faults).toContainEqual({ seat: 0, kind: 'no-reveal' });
   });
+
+  it('(j) a seat that posted two differing reveals is a reveal-conflict, even if given the good one', async () => {
+    // Seat 0 posts an honest reveal first, then a differing (losing) reveal second. The user hands
+    // the verifier the second (good-looking) signature, but the earliest-reveal rule makes the
+    // first canonical and flags the conflict, mirroring the live Result screen (D1 / design 5.4).
+    const game = await makeGame();
+    const { chain, revealSigs } = await seedChain(game);
+
+    // A second reveal from seat 0 with a different secret: this is the equivocation.
+    const secondSig = chain.post(
+      game.host.identity.publicKey,
+      encodeRevealMemo(ROOM, '9876', game.host.salt),
+    );
+
+    const result = await verifyGame(
+      { transcript: file(game), revealSigs: [secondSig, revealSigs[1]] },
+      { chain },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.verdict.kind !== 'final') throw new Error('expected final verdict');
+    expect(result.verdict.faults).toContainEqual({ seat: 0, kind: 'reveal-conflict' });
+    // The earliest (honest) reveal is canonical, so the verdict uses seat 0's real secret and the
+    // conflict is seat 0's own fault: seat 1 wins.
+    expect(result.verdict.result).toBe('seat1');
+    expect(result.revealSigs[0]).toBe(revealSigs[0]);
+  });
+
+  it('(k) resolves the commit from the transcript COMMIT sig when the address scan is empty', async () => {
+    // Exercises resolveCommit's fallback: a chain whose listMemoTxs never returns seat 0's commit
+    // (as if the audit scan found nothing) while getMemoTx still resolves the COMMIT tx the
+    // transcript names. The named COMMIT must then feed the honest verdict.
+    const game = await makeGame();
+    const { chain, revealSigs } = await seedChain(game);
+    const hiddenCommit = commitSigForSeat(game, 0);
+
+    const scanBlind = emptyScanFor(chain, game.host.identity.publicKey);
+
+    const result = await verifyGame({ transcript: file(game), revealSigs }, { chain: scanBlind });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.verdict.kind !== 'final') throw new Error('expected final verdict');
+    // Seat 0's commit was found only via the named COMMIT tx, so the game still verifies clean.
+    expect(result.verdict.faults).toEqual([]);
+    expect(result.commitSigs[0]).toBe(hiddenCommit);
+  });
 });
+
+/** The COMMIT tx signature seat `seat` named in its COMMIT message in the game's transcript. */
+function commitSigForSeat(game: Game, seat: 0 | 1): string {
+  const player = seat === 0 ? game.host : game.guest;
+  for (const message of game.messages) {
+    if (message.from !== player.identity.publicKey) continue;
+    const body = decodeBody(message.type, message.payload);
+    if (body?.type === 'COMMIT') return body.txSig;
+  }
+  throw new Error('no COMMIT message for seat');
+}
+
+/**
+ * Wraps a chain so that listMemoTxs returns nothing for `blindAddress` (simulating an audit scan
+ * that found no commit for that seat) while getMemoTx still resolves every seeded transaction.
+ * This forces resolveCommit down its transcript-named-COMMIT fallback for that seat.
+ */
+function emptyScanFor(chain: MemoryChain, blindAddress: string): Chain {
+  return {
+    sendMemo: (signer, text) => chain.sendMemo(signer, text),
+    getMemoTx: (sig) => chain.getMemoTx(sig),
+    listMemoTxs: (address, room) =>
+      address === blindAddress ? Promise.resolve([]) : chain.listMemoTxs(address, room),
+  };
+}

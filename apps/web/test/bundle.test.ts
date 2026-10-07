@@ -30,11 +30,14 @@ describe('production bundle', () => {
    * so it is found by content rather than by a fixed file name. */
   function heavyChunk(): string {
     const entry = assetFiles().find((f) => f.startsWith('index-')) as string;
-    const heavy = assetFiles().find(
+    const heavy = assetFiles().filter(
       (f) => f !== entry && readFileSync(`${distAssets}/${f}`, 'utf8').includes('supabase'),
     );
-    if (!heavy) throw new Error('no lazy chunk carries the heavy clients');
-    return heavy;
+    if (heavy.length === 0) throw new Error('no lazy chunk carries the heavy clients');
+    // Friend mode and the verifier share one lazily loaded chunk. If the bundler ever split the
+    // heavy clients across two chunks, this guard would inspect only one, so pin the expectation.
+    expect(heavy.length).toBe(1);
+    return heavy[0] as string;
   }
 
   it('splits friend mode out of the always-loaded entry', () => {
