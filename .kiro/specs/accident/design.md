@@ -49,7 +49,7 @@ Stack: pnpm workspaces, TypeScript strict, Vite, React, Tailwind, Vitest, `@sola
 ```ts
 // packages/protocol/src/ports.ts
 export interface Transport {
-  join(room: string, onMessage: (raw: string) => void, onStatus: (s: 'up'|'down') => void): Promise<void>;
+  join(room: string, handlers: { onMessage(raw: string): void; onStatus(status: 'up' | 'down'): void }): Promise<void>;
   send(room: string, raw: string): Promise<void>;
   leave(room: string): Promise<void>;
 }
@@ -65,9 +65,22 @@ export interface Storage { get(k: string): Promise<string|null>; set(k: string, 
 export interface Clock { now(): number; setTimeout(fn: () => void, ms: number): () => void; }
 ```
 
-Engine API (`packages/engine`): `isValidCode`, `score(secret, guess) -> number`, `isValidFeedback(n)`, `allCodes()`, `filterCandidates(candidates, guess, feedback)`, `chooseGuess(level, candidates, rng)`.
+Engine API (`packages/engine`, implemented). Every exported function validates its input and throws `RangeError`, so it is safe on opponent-controlled data. Unchecked fast paths live in an internal module and are not exported.
 
-Protocol API (`packages/protocol`): `commitment`, `encodeCommitMemo`, `encodeRevealMemo`, `parseMemo`, `signMessage`, `verifyMessage`, `Session` (state machine), `finalise`, `transcriptHash`.
+- Rules: `isValidCode`, `assertCode`, `score`, `scoreParts`, `isValidFeedback`, `assertFeedback`, `encodeFeedback`, `decodeFeedback`, `VALID_FEEDBACK`, `guesserOf`, `answererOf`, `roundOf`.
+- Candidates: `allCodes`, `filterCandidates`, `candidatesFromHistory`.
+- Game: `gameStatus(feedbacks)` for live play; `findHits`, `verdictFromSecrets`, `findLies` for the post-reveal checks the protocol finalisation uses.
+- Computer: `chooseGuess(level, candidates, rng)`, `chooseGuessHard`, `LEVELS`, `OPENING_GUESS`.
+- Randomness: `secureRng()` (WebCrypto; use for a player's real secret), `mulberry32(seed)` (tests only), `randomCode(rng)`, `randomInt`, `pick`.
+
+Protocol API (`packages/protocol`, pure core implemented; session and adapters pending). WebCrypto and tweetnacl only; no DOM, network or RPC.
+
+- Identifiers and bytes: `generateRoomCode`, `isValidRoom`, `generateSaltHex`, `isValidPublicKey`, `isValidSignature`, hex and SHA-256 helpers.
+- Commitment: `commitment`, `verifyCommitment` (hex strings for salt and commitment, base58 for keys).
+- Memo records: `encodeCommitMemo`, `encodeRevealMemo`, `parseMemo`, `selectCommit`, `selectReveal` (earliest successful record wins; a different later one sets `equivocated` or `conflicting`).
+- Messages: `generateIdentity`, `identityFromSecretKey`, `signMessage`, `verifyMessage`, `createVerifier`, `encodeMessage`, `parseMessage`, `openMessage`, `encodeBody`, `decodeBody`. Payloads use a strict grammar: canonical decimals, no extra fields, 1,024-character limit.
+- Transcript: `assembleTranscript(room, messages)` (order-independent, drops forgeries and strangers, flags equivocation), `transcriptMessages`, `transcriptLines`, `transcriptHash`.
+- Verdict: `finalise({transcript, commits, reveals, revealWindowClosed})` returns `pending`, `abandoned` or `final`. A final verdict carries `result`, `reason` (`fault`, `both-at-fault`, `first-hit`, `equal-round`, `cap`) and the evidence for every `Fault`. `toChainCommit` and `toChainReveal` adapt the Memo selectors.
 
 ## 3. Wire format
 
@@ -121,6 +134,21 @@ any -> ABANDONED (cancel, vault lost)
 
 Persisted after every transition and every message: state, secret, salt, outgoing messages, incoming transcript.
 
+### 4.1 Session (implemented in `packages/protocol/src/session.ts`)
+
+The state machine above is realised as an event-sourced `Session`:
+
+- **State is derived from a log** of accepted, signed messages from both players. A refresh reloads the log; there is no second copy of the state to disagree with it.
+- **Persist before transmit.** Every message is written to storage before it is sent, so a crash can never lead to a sequence number being reused for a different message (which would look like cheating). The secret and salt are saved before the commit Memo is sent, and an acknowledgement is only sent after what it acknowledges has been saved.
+- **One serial queue** for every mutation. Chain polling and timers run detached but apply their results through the queue.
+- **Acceptance rules.** A message is applied, held, ignored or counted as a violation. Guesses and answers are held until the play gate opens; a REVEAL is held until the game is over; anything out of turn, for the wrong index or from the wrong seat is a violation. A violation still consumes its sequence number so it is not resent forever.
+- **Delivery.** SYNC acknowledgements and resends. Repeats start at 3 s, double up to 30 s while nothing is heard, reset when the opponent proves alive, and stop a few attempts after the game is settled. A newly pinned opponent is told everything at once.
+- **Chain polling** starts at 250 ms and doubles to 2 s. It scans the opponent's address when a signature is missing or not found, and stops when the game is settled.
+- **Timers.** 90 s to open the play gate once the opponent has joined (a host waiting for a friend never times out); 180 s per move (UI only); 180 s reveal window.
+- **Errors.** A failed Memo is retried three times, then the session waits for `retry()` and shows a retryable error. Internal failures are reported in `view().error`, never swallowed.
+
+Known limit: both players compute the transcript hash at their own game end. If one side learned of the other's commit by scanning the chain and never received the COMMIT message, the hashes can differ. The verdict does not depend on the hash, so this is reported as a transcript dispute, not a fault.
+
 ## 5. Finalisation
 
 ### 5.1 Inputs
@@ -173,7 +201,20 @@ Input: two reveal tx signatures plus a transcript file. Steps: fetch both reveal
 | Reveal | `ACC1\|<room>\|R\|<secret>\|<64 hex salt>\|<64 hex transcript hash>` | 148 **[Proposed]** |
 | Reveal (v1.1 form, accepted for compatibility) | `ACC1\|<room>\|R\|<secret>\|<64 hex salt>` | 83 |
 
-Memo program ID: Memo v2 `MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr` **[Verify with a devnet transaction before relying on it]**. The signer is listed as a signer account on the instruction.
+Memo program ID: Memo v2 `MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr`. The signer is listed as a signer account on the instruction, so the program verifies the signature and logs `Signed by <key>`.
+
+**Measured on devnet (task 4.2), by simulating the exact transaction the game sends** (`packages/solana/devnet-simulate.result.json`, reproduce with `pnpm --filter @accident/solana devnet-simulate`):
+
+| Record | Memo bytes | Transaction bytes | Compute units | Result |
+| --- | --- | --- | --- | --- |
+| Commit | 78 | 248 | 42,841 | succeeds, memo echoed in the log |
+| Reveal (v1.1) | 83 | 253 | 44,458 | succeeds |
+| Reveal with transcript hash | 148 | 319 | 67,277 | succeeds |
+
+- **The longest signed Memo that works is 526 bytes** (527 fails with `ProgramFailedToComplete`). The documented 566 bytes applies to an unsigned instruction. With a signer attached the program runs out of its default 200,000 compute units first. Our largest record is 148 bytes, so there are more than three times that to spare.
+- **The fee is 5,000 lamports per transaction**, so a four-Memo game costs 0.00002 SOL and a 0.01 SOL drip covers about 500 transactions.
+- The real program exists on devnet as an executable account, and real Memo transactions from other programs read back correctly through the adapter, including Memos mixed with ComputeBudget and token instructions.
+- **Not yet done:** actually submitting a Memo. The public devnet faucet returned 429 ("airdrop limit reached or faucet dry") for this sandbox, so there was no SOL to pay the fee. `pnpm --filter @accident/solana devnet-check` does the full send, read-back and address-scan round trip once a funded key is available (set `DEVNET_FUNDED_SECRET_KEY`, or try again after the faucet limit resets).
 
 The chain adapter sends at `confirmed` commitment. Lookup polls `getTransaction` with backoff (250 ms up to 2 s), with a 20 s ceiling before the `getSignaturesForAddress` fallback.
 
@@ -228,6 +269,6 @@ Engine strategies exactly as PRD section 7. The Worker receives `{level, history
 1. Relay provider: Supabase Realtime **[Default]** or Cloudflare-based. Decide after a latency check from Nigeria.
 2. Hosting: Vercel **[Default]**.
 3. Licence: MIT **[Default]**.
-4. Memo program ID and signer behaviour confirmed by a real devnet transaction.
+4. ~~Memo program ID and signer behaviour~~ confirmed by devnet simulation. A real submitted transaction is still to do (faucet rate-limited).
 5. Colosseum deadline and any on-chain program requirement.
 6. Test phones.

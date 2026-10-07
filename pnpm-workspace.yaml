@@ -1,0 +1,18 @@
+packages:
+  - packages/*
+  - apps/*
+
+# Dependency build scripts are off unless listed here.
+allowBuilds:
+  # Links the platform binary for esbuild, which the bundler (Vite) and tsx both need.
+  esbuild: true
+  # Optional native speed-ups for the `ws` websocket library inside @solana/web3.js. We only use
+  # HTTP JSON-RPC and the browser never loads them, so no native code runs for these.
+  bufferutil: false
+  utf-8-validate: false
+
+# pnpm holds back packages published very recently. Vite 8.3.3 (2026-10-06) is let through on
+# purpose: its notes list dev-server file-serving fixes (fs.serve, safeModulePaths), the commit is
+# GitHub-verified and the release is immutable. Drop this entry once the version is a week old.
+minimumReleaseAgeExclude:
+  - vite@8.3.3
