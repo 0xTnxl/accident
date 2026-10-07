@@ -25,10 +25,24 @@ describe('production bundle', () => {
     }
   }, 120_000);
 
-  it('splits friend mode into its own chunk', () => {
+  /** The lazily loaded chunk that carries the heavy chain and relay clients. Its exact name
+   * depends on how the bundler groups the friend-mode and verifier code, which both pull them in,
+   * so it is found by content rather than by a fixed file name. */
+  function heavyChunk(): string {
+    const entry = assetFiles().find((f) => f.startsWith('index-')) as string;
+    const heavy = assetFiles().find(
+      (f) => f !== entry && readFileSync(`${distAssets}/${f}`, 'utf8').includes('supabase'),
+    );
+    if (!heavy) throw new Error('no lazy chunk carries the heavy clients');
+    return heavy;
+  }
+
+  it('splits friend mode out of the always-loaded entry', () => {
     const files = assetFiles();
     expect(files.some((f) => f.startsWith('index-'))).toBe(true);
-    expect(files.some((f) => f.startsWith('FriendRoot-'))).toBe(true);
+    // The friend-mode and verifier code is lazily loaded, so the heavy clients live in a split
+    // chunk, not the entry.
+    expect(heavyChunk()).not.toMatch(/^index-/);
   });
 
   it('keeps the always-loaded entry well under the 300 KB gzipped budget', async () => {
@@ -48,9 +62,8 @@ describe('production bundle', () => {
     expect(source).not.toContain('@solana/web3.js');
   });
 
-  it('puts those clients in the friend-mode chunk, where they belong', () => {
-    const friend = assetFiles().find((f) => f.startsWith('FriendRoot-')) as string;
-    const source = readFileSync(`${distAssets}/${friend}`, 'utf8');
+  it('puts those clients in a lazily loaded chunk, where they belong', () => {
+    const source = readFileSync(`${distAssets}/${heavyChunk()}`, 'utf8');
     expect(source.length).toBeGreaterThan(100_000);
     expect(source).toContain('supabase');
   });

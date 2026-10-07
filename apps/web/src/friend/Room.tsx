@@ -1,6 +1,8 @@
-import { decodeFeedback } from '@accident/engine';
-import type { Fault, SessionView } from '@accident/protocol';
+import type { SessionView } from '@accident/protocol';
 import { useEffect, useState } from 'react';
+import { faultText } from './faults.js';
+
+export { faultText } from './faults.js';
 import { useHidden } from '../lib/useHidden.js';
 import { shareLink } from '../lib/route.js';
 import { Board } from '../ui/Board.js';
@@ -453,32 +455,6 @@ function Revealing({ view, onRetry, onLeave }: RoomProps & { view: SessionView }
       </div>
     </Shell>
   );
-}
-
-export function faultText(fault: Fault): string {
-  switch (fault.kind) {
-    case 'wrong-answer': {
-      const claimed = decodeFeedback(fault.claimed);
-      const actual = decodeFeedback(fault.actual);
-      return `Guess ${fault.index + 1} was answered ${claimed.dead} dead, ${claimed.injured} injured, but the true answer was ${actual.dead} dead, ${actual.injured} injured.`;
-    }
-    case 'invalid-secret':
-      return 'Revealed a secret that is not four different digits.';
-    case 'commitment-mismatch':
-      return 'Revealed a secret that does not match what was locked in.';
-    case 'commit-equivocation':
-      return 'Locked in two different secrets.';
-    case 'message-equivocation':
-      return 'Sent two conflicting messages for the same move.';
-    case 'reveal-signer-mismatch':
-      return 'The reveal was signed by a different key.';
-    case 'reveal-conflict':
-      return 'Published two different reveals.';
-    case 'no-commit':
-      return 'Never locked in a secret.';
-    case 'no-reveal':
-      return 'Never revealed their secret.';
-  }
 }
 
 function Result(props: RoomProps & { view: SessionView }) {

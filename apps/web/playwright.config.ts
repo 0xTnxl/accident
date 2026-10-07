@@ -26,7 +26,12 @@ export default defineConfig({
   projects: [
     {
       name: 'live',
-      testMatch: ['practice.spec.ts', 'unconfigured.spec.ts', 'analytics.spec.ts'],
+      testMatch: [
+        'practice.spec.ts',
+        'unconfigured.spec.ts',
+        'analytics.spec.ts',
+        'verify.spec.ts',
+      ],
       use: { ...device, baseURL: 'http://127.0.0.1:4173' },
     },
     {
