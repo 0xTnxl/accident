@@ -32,22 +32,22 @@ Ordered to the PRD build plan, 4 to 12 October 2026. Each task lists the require
   - [x] 5.2 `encodeCommitMemo`, `encodeRevealMemo`, strict `parseMemo` (both reveal forms)
   - [x] 5.3 `Chain` adapter on web3.js v1 (`packages/solana`): `sendMemo`, `getMemoTx`, `listMemoTxs`. Retry and backoff live in the session
   - [x] 5.4 Memo tests: wrong signer, text or room rejected; first-wins canonical selection (pure selection logic done; fetching by signature belongs to 5.3)
-- [ ] 6. Vault and keys (REQ-5)
-  - [ ] 6.1 Burner keypair, localStorage plus IndexedDB, `storage.persist()`
-  - [ ] 6.2 Save secret and salt before any commit send
-- [ ] 7. Relayer (REQ-6, REQ-16)
-  - [ ] 7.1 `POST /api/drip` with all protections and logging
-  - [ ] 7.2 `POST /api/event` with allow-list and rate limit
-  - [ ] 7.3 Fund the wallet from several faucets; document top-up
+- [x] 6. Vault and keys (REQ-5)
+  - [x] 6.1 Burner keypair, localStorage plus `storage.persist()` (localStorage is enough for a 64-byte burner key; IndexedDB was not needed)
+  - [x] 6.2 Save secret and salt before any commit send
+- [~] 7. Relayer (REQ-6, REQ-16)
+  - [x] 7.1 `POST /api/drip` with all protections and logging
+  - [x] 7.2 `POST /api/event` with allow-list and rate limit
+  - [ ] 7.3 Fund the wallet from several faucets; document top-up (the public faucet returned 429)
 
 **Exit:** browser commitment equals the A.2 hash; one commit and one reveal Memo land on devnet and verify by signature.
 
 ## Day 2: Tue 6 Oct, protocol and full game
 
-- [ ] 8. Messages and transport (REQ-10)
+- [x] 8. Messages and transport (REQ-10)
   - [x] 8.1 `signMessage`, `verifyMessage`, parsing, and sequence handling with buffering
   - [x] 8.2 In-memory `Transport`, `Chain`, `Storage` and `Clock` for tests (`src/testing/`)
-  - [ ] 8.3 Supabase Realtime `Transport` adapter
+  - [x] 8.3 Supabase Realtime `Transport` adapter
   - [x] 8.4 SYNC and resend timer with backoff; drop, duplicate, reorder, disconnect and refresh tests
 - [ ] 9. Session state machine (REQ-4, REQ-9, REQ-11)
   - [x] 9.1 Host/guest HELLO and pinning, including the host key from the share link (the room code and link UI belong to the web app)
