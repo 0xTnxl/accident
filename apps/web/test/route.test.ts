@@ -12,6 +12,7 @@ describe('parseRoute', () => {
     ['/stats', 'stats'],
     ['/practice', 'practice'],
     ['/friend', 'friend'],
+    ['/verify', 'verify'],
   ])('%s is the %s screen', (path, name) => {
     expect(parseRoute(path)).toEqual({ name });
   });
@@ -70,6 +71,7 @@ describe('routePath', () => {
     { name: 'stats' },
     { name: 'practice' },
     { name: 'friend' },
+    { name: 'verify' },
     { name: 'room', code: 'ABC234', role: 'host', hostKey: undefined },
     { name: 'room', code: 'ABC234', role: 'guest', hostKey: KEY },
     { name: 'room', code: 'ABC234', role: 'guest', hostKey: undefined },

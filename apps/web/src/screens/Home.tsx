@@ -6,9 +6,10 @@ interface HomeProps {
   onFriend: () => void;
   onHow: () => void;
   onStats: () => void;
+  onVerify: () => void;
 }
 
-export function Home({ onPractice, onFriend, onHow, onStats }: HomeProps) {
+export function Home({ onPractice, onFriend, onHow, onStats, onVerify }: HomeProps) {
   return (
     <Shell title="Accident">
       <div className="flex flex-1 flex-col justify-center gap-6 pb-6">
@@ -42,6 +43,13 @@ export function Home({ onPractice, onFriend, onHow, onStats }: HomeProps) {
             className="min-h-11 px-2 underline underline-offset-4"
           >
             My stats
+          </button>
+          <button
+            type="button"
+            onClick={onVerify}
+            className="min-h-11 px-2 underline underline-offset-4"
+          >
+            Verify a game
           </button>
         </nav>
       </div>

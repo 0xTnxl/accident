@@ -7,6 +7,8 @@ export type Route =
   | { name: 'stats' }
   | { name: 'practice' }
   | { name: 'friend' }
+  /** The Verifier: check a finished game from its transcript and the two reveal signatures. */
+  | { name: 'verify' }
   /** A friend game. The host made the room; a guest arrived from a link or typed the code. */
   | { name: 'room'; code: string; role: 'host' | 'guest'; hostKey: string | undefined }
   | { name: 'notfound' };
@@ -31,6 +33,8 @@ export function parseRoute(pathname: string, search = '', hash = ''): Route {
       return { name: 'practice' };
     case '/friend':
       return { name: 'friend' };
+    case '/verify':
+      return { name: 'verify' };
   }
   const match = /^\/r\/([^/]+)$/.exec(path);
   if (match) {
@@ -67,6 +71,8 @@ export function routePath(route: Route): string {
       return '/practice';
     case 'friend':
       return '/friend';
+    case 'verify':
+      return '/verify';
     case 'room':
       return route.role === 'host'
         ? `/r/${route.code}?host`

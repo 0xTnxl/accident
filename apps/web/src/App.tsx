@@ -15,6 +15,12 @@ const FriendRoot = lazy(() =>
   import('./friend/FriendRoot.js').then((m) => ({ default: m.FriendRoot })),
 );
 
+// The Verifier reads the chain through the Solana client too, so it is lazy-loaded for the same
+// reason: to keep @solana/web3.js out of the always-loaded entry.
+const VerifierPage = lazy(() =>
+  import('./verify/VerifierPage.js').then((m) => ({ default: m.VerifierPage })),
+);
+
 function Loading() {
   return (
     <Shell title="Play a friend">
@@ -38,6 +44,7 @@ export function App(): ReactNode {
           onFriend={() => go({ name: 'friend' })}
           onHow={() => go({ name: 'how' })}
           onStats={() => go({ name: 'stats' })}
+          onVerify={() => go({ name: 'verify' })}
         />
       );
     case 'how':
@@ -51,6 +58,12 @@ export function App(): ReactNode {
       return (
         <Suspense fallback={<Loading />}>
           <FriendRoot route={route} go={go} />
+        </Suspense>
+      );
+    case 'verify':
+      return (
+        <Suspense fallback={<Loading />}>
+          <VerifierPage onBack={home} />
         </Suspense>
       );
     case 'notfound':
