@@ -8,8 +8,11 @@ coverage/
 .DS_Store
 .vercel/
 .turbo/
+.secrets/
 
 # Playwright output
 test-results/
 playwright-report/
 dist-sim/
+.vercel
+.env*
