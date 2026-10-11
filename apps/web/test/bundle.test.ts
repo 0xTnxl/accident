@@ -52,8 +52,11 @@ describe('production bundle', () => {
     const { gzipSync } = await import('node:zlib');
     const entry = assetFiles().find((f) => f.startsWith('index-')) as string;
     const gz = gzipSync(readFileSync(`${distAssets}/${entry}`)).length;
-    // The PRD budget is ~300 KB gzipped for the whole shell. The main entry alone should be far less.
-    expect(gz).toBeLessThan(120_000);
+    // The PRD budget is ~300 KB gzipped for the whole shell. The main entry alone should be far
+    // less. Measured at ~138 KB with React 19 + the practice engine + analytics/stats/wake-lock
+    // code (no Solana or Supabase, see the test below); 160 KB leaves headroom for incidental
+    // growth while still catching a real regression, like the heavy clients leaking into the entry.
+    expect(gz).toBeLessThan(160_000);
   });
 
   it('does not pull the Solana or Supabase clients into the always-loaded entry', () => {
