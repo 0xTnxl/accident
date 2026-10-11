@@ -14,7 +14,7 @@ A fully live friend game needs three external services:
 | Service           | Used for                                                            | Needed by                        |
 | ----------------- | ------------------------------------------------------------------- | -------------------------------- |
 | **Vercel**        | Hosting the web app and the `/api/drip` + `/api/event` functions    | Everything except local practice |
-| **Supabase**      | Realtime relay (friend-mode messages) and the drip/analytics tables | Friend mode, drip, analytics     |it 
+| **Supabase**      | Realtime relay (friend-mode messages) and the drip/analytics tables | Friend mode, drip, analytics     |
 | **Solana devnet** | The commit/reveal Memo records and the funding wallet               | The on-chain play gate           |
 
 Practice mode needs **none** of these — it runs entirely in the browser. So the first milestone
@@ -80,13 +80,13 @@ Names come from `.env.example`.
 
 **Web (public — safe to expose in the bundle):**
 
-| Name                     | Value                                                                             |
-| ------------------------ | ---------------------------------------------------------------------------------- |
-| `VITE_SUPABASE_URL`      | Supabase project URL                                                               |
-| `VITE_SUPABASE_ANON_KEY` | Supabase `anon` key                                                                |
-| `VITE_SOLANA_RPC_URL`    | Your devnet RPC URL (optional; defaults to the public devnet RPC)                  |
+| Name                     | Value                                                                                                                                                                                                                                                                         |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VITE_SUPABASE_URL`      | Supabase project URL                                                                                                                                                                                                                                                          |
+| `VITE_SUPABASE_ANON_KEY` | Supabase `anon` key                                                                                                                                                                                                                                                           |
+| `VITE_SOLANA_RPC_URL`    | Your devnet RPC URL (optional; defaults to the public devnet RPC)                                                                                                                                                                                                             |
 | `VITE_BACKEND`           | Optional; `'live'` or `'sim'`, defaults to `'live'`. Leave unset in Vercel — only the `dev:sim`/`build:sim` scripts set this to `'sim'` locally. If it's accidentally set to `sim` in Vercel, friend mode silently runs the in-memory simulation instead of the real backend. |
-| `VITE_DRIP_URL`          | Optional; overrides where the web app posts drip requests. Defaults to `/api/drip` (the co-located Vercel function) — leave unset unless the drip function is hosted elsewhere. |
+| `VITE_DRIP_URL`          | Optional; overrides where the web app posts drip requests. Defaults to `/api/drip` (the co-located Vercel function) — leave unset unless the drip function is hosted elsewhere.                                                                                               |
 
 > CI fails the build if a **server** secret name (`FUNDING_WALLET_SECRET_KEY`,
 > `SUPABASE_SERVICE_ROLE_KEY`) appears in the built web app, or if anything that looks like a
@@ -140,15 +140,16 @@ With Stages 1–3 green:
    adapter from `apps/web/src/friend/transports.ts`) and calling `runLiveBot` is a short script you
    write before this step, not something that ships today. It reads, as shell env vars (not Vercel):
 
-   | Name                | Value                                                                             |
-   | ------------------- | ---------------------------------------------------------------------------------- |
-   | `ACCIDENT_ROOM`     | **Required.** The room code to join — the bot throws immediately if unset.         |
-   | `ACCIDENT_ROLE`     | Optional; `'host'` or `'guest'`, defaults to `'guest'`.                            |
+   | Name                | Value                                                                                                                          |
+   | ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+   | `ACCIDENT_ROOM`     | **Required.** The room code to join — the bot throws immediately if unset.                                                     |
+   | `ACCIDENT_ROLE`     | Optional; `'host'` or `'guest'`, defaults to `'guest'`.                                                                        |
    | `ACCIDENT_RPC_URL`  | Optional; devnet RPC URL, defaults to the public devnet RPC. Separate from `SOLANA_RPC_URL` — the bot does not read that name. |
-   | `ACCIDENT_HOST_KEY` | Optional; pins the host's public key when joining as `guest` (from the room's share link). |
+   | `ACCIDENT_HOST_KEY` | Optional; pins the host's public key when joining as `guest` (from the room's share link).                                     |
 
    The simpler path for this demo is still the Verifier page (`/verify`) — paste two reveals and a
    transcript, no wiring required.
+
 3. **Two phones on mobile data.** The real target (spec tasks 4.3, 15, 17): confirm the 15-second
    first-guess goal, screen wake lock, the hidden-tab warning, and resilience (refresh mid-game,
    background 60 s, airplane blip, clear storage).
