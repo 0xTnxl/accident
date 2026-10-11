@@ -1,7 +1,10 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { fileURLToPath } from 'node:url';
 
-const SHOTS = '/projects/sandbox/.kiro/artifacts/screenshots';
+// Debug screenshots, not assertions. Written under test-results/, which is gitignored and already
+// the directory CI uploads as a failure artifact.
+const SHOTS = fileURLToPath(new URL('../test-results/screenshots', import.meta.url));
 
 /** Taps the four digits of a code on the on-screen keypad. */
 async function tapCode(page: Page, code: string): Promise<void> {
