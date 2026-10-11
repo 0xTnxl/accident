@@ -3,6 +3,9 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     include: ['test/**/*.test.ts'],
+    // These tests drive a real protocol Session through a ManualClock across a full game; coverage
+    // instrumentation slows them down, same as packages/protocol and packages/engine.
+    testTimeout: 60_000,
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
