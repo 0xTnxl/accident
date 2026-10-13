@@ -310,6 +310,7 @@ function Playing(props: RoomProps & { view: SessionView }) {
 
   return (
     <Shell
+      wide
       title={`Room ${view.room}`}
       onBack={() => {
         if (window.confirm('Leave this game? You can come back to it on this phone.')) onLeave();
@@ -318,10 +319,11 @@ function Playing(props: RoomProps & { view: SessionView }) {
     >
       {backend.kind === 'sim' ? <SimulationBanner /> : null}
       <HiddenWarning />
+      {/* Below the md breakpoint there is only room for one board, so a tab switches between them. */}
       <div
         role="tablist"
         aria-label="Guesses"
-        className="mb-1 grid grid-cols-2 gap-1 text-sm font-bold"
+        className="mb-1 grid grid-cols-2 gap-1 text-sm font-bold md:hidden"
       >
         {(
           [
@@ -342,25 +344,24 @@ function Playing(props: RoomProps & { view: SessionView }) {
         ))}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {tab === 'mine' ? (
-          <>
-            <Board
-              title="Your guesses"
-              rows={mine}
-              emptyText={view.seat === 0 ? 'You guess first.' : 'Your friend guesses first.'}
-            />
-            <div className="mt-3">
-              <Notepad />
-            </div>
-          </>
-        ) : (
+      <div className="min-h-0 flex-1 overflow-y-auto md:grid md:grid-cols-2 md:gap-6 md:overflow-visible">
+        <div className={tab === 'mine' ? 'block' : 'hidden md:block'}>
+          <Board
+            title="Your guesses"
+            rows={mine}
+            emptyText={view.seat === 0 ? 'You guess first.' : 'Your friend guesses first.'}
+          />
+          <div className="mt-3">
+            <Notepad />
+          </div>
+        </div>
+        <div className={tab === 'theirs' ? 'block' : 'hidden md:block'}>
           <Board
             title="Friend’s guesses at your number"
             rows={theirs}
             emptyText="No guesses from your friend yet."
           />
-        )}
+        </div>
       </div>
 
       <div className="pt-2">
