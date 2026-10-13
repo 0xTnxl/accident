@@ -19,6 +19,8 @@ export interface ControllerInit {
   backend: Backend;
   /** Simulation only: names this tab's player so its saved game stays separate. */
   player?: string | undefined;
+  /** How long the player on the clock has before the other side may claim a timeout, in ms. */
+  turnMs?: number | undefined;
 }
 
 /** The secret and salt the player chose, kept until the session has saved them. */
@@ -104,6 +106,7 @@ export class FriendController {
       chain: this.init.backend.chain,
       storage: new LocalSessionStorage(localStorage, this.init.player),
       clock: realClock,
+      ...(this.init.turnMs === undefined ? {} : { options: { turnMs: this.init.turnMs } }),
     });
     if (!session) return false;
     await this.attach(session);
@@ -133,6 +136,7 @@ export class FriendController {
       chain: this.init.backend.chain,
       storage: new LocalSessionStorage(localStorage, this.init.player),
       clock: realClock,
+      ...(this.init.turnMs === undefined ? {} : { options: { turnMs: this.init.turnMs } }),
     });
     await this.attach(session);
   }

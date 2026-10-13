@@ -7,7 +7,7 @@ import type { Backend } from './backend.js';
 import { createBackend } from './backend.js';
 import type { Choice, SetupState } from './controller.js';
 import { Analytics, noopAnalytics } from './analytics.js';
-import { readEnv } from './env.js';
+import { readEnv, readTurnMs } from './env.js';
 import { Lobby } from './Lobby.js';
 import { controllerFor, leaveRoom } from './registry.js';
 import { Room } from './Room.js';
@@ -119,6 +119,7 @@ function ActiveRoom({
         identity,
         backend: be,
         player,
+        turnMs: readTurnMs(),
       }),
     [route.code, route.role, hostKey, identity, be, player],
   );

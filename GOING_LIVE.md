@@ -87,6 +87,7 @@ Names come from `.env.example`.
 | `VITE_SOLANA_RPC_URL`    | Your devnet RPC URL (optional; defaults to the public devnet RPC)                                                                                                                                                                                                             |
 | `VITE_BACKEND`           | Optional; `'live'` or `'sim'`, defaults to `'live'`. Leave unset in Vercel — only the `dev:sim`/`build:sim` scripts set this to `'sim'` locally. If it's accidentally set to `sim` in Vercel, friend mode silently runs the in-memory simulation instead of the real backend. |
 | `VITE_DRIP_URL`          | Optional; overrides where the web app posts drip requests. Defaults to `/api/drip` (the co-located Vercel function) — leave unset unless the drip function is hosted elsewhere.                                                                                               |
+| `VITE_TURN_SECONDS`      | Optional; how long a player has on the clock before the other side may claim a timeout, in whole seconds. Defaults to 60. UI-only per REQ-13 — never enforced on-chain, and raising or lowering it does not change anything about the commit/reveal or play-gate rules.       |
 
 > CI fails the build if a **server** secret name (`FUNDING_WALLET_SECRET_KEY`,
 > `SUPABASE_SERVICE_ROLE_KEY`) appears in the built web app, or if anything that looks like a
