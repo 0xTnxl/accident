@@ -4,6 +4,9 @@ import { Connection } from '@solana/web3.js';
 import { DEFAULT_RPC } from '../friend/backend.js';
 import { readEnv } from '../friend/env.js';
 
+// This module already imports friend/backend.js above (for DEFAULT_RPC), which installs the
+// Buffer shim @solana/web3.js needs; see the comment there for why. Nothing further needed here.
+
 /**
  * Builds the read-only Solana chain the Verifier uses to fetch reveal and commit Memos. It mirrors
  * the live wiring in friend/backend.ts. @solana/web3.js is imported here so this module, loaded

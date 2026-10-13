@@ -2,8 +2,20 @@ import type { Chain, Transport } from '@accident/protocol';
 import { SolanaChain } from '@accident/solana';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { createClient } from '@supabase/supabase-js';
+import { Buffer } from 'buffer';
 import { SimChain } from './simChain.js';
 import { SupabaseTransport, TabTransport } from './transports.js';
+
+// @solana/web3.js builds its Memo instruction data with Node's Buffer (packages/solana/src/chain.ts),
+// which only exists as a browser global if something defines it. Vite does not polyfill it, so the
+// first real on-chain commit crashed every browser with "Buffer is not defined" the moment a secret
+// was locked in; nothing in the test suite caught this because tests run in real Node, where Buffer
+// is already a true global. Importing the `buffer` package here (not Node's own, which does not
+// exist for the bundler) and assigning it keeps the shim out of the always-loaded entry, since this
+// module is only reached once friend mode's live backend is lazily loaded.
+if (typeof globalThis.Buffer === 'undefined') {
+  globalThis.Buffer = Buffer;
+}
 
 /** Which services friend mode talks to. */
 export type BackendKind = 'live' | 'sim';
