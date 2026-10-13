@@ -2,6 +2,15 @@ packages:
   - packages/*
   - apps/*
 
+# rpc-websockets (a dependency of @solana/web3.js, used for its WebSocket RPC subscriptions) ships
+# a CJS file that does require('uuid'), but depends on uuid@14, which dropped CommonJS support
+# entirely starting at uuid@12. That crashes Vercel's Node function runtime (ERR_REQUIRE_ESM) the
+# moment anything touches @solana/web3.js's Connection/websocket path. Pin to the newest release
+# that still ships CJS; rpc-websockets only calls the stable v4() export, unaffected by any API
+# change between 11.x and 14.x.
+overrides:
+  uuid: 11.1.1
+
 # Dependency build scripts are off unless listed here.
 allowBuilds:
   # Links the platform binary for esbuild, which the bundler (Vite) and tsx both need.
