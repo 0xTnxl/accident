@@ -6,12 +6,17 @@ interface ShellProps {
   onBack?: () => void;
   right?: ReactNode;
   children: ReactNode;
+  /**
+   * Lets a screen grow beyond the usual phone-width column on larger screens, for layouts that
+   * put two boards side by side. Most screens leave this unset.
+   */
+  wide?: boolean;
 }
 
 /** The page frame: a slim header and a scrolling body that leaves room for the margin line. */
-export function Shell({ title, onBack, right, children }: ShellProps) {
+export function Shell({ title, onBack, right, children, wide = false }: ShellProps) {
   return (
-    <div className="mx-auto flex h-full max-w-md flex-col">
+    <div className={`mx-auto flex h-full flex-col ${wide ? 'max-w-md md:max-w-4xl' : 'max-w-md'}`}>
       <header className="flex items-center gap-2 px-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 pl-12">
         {onBack ? (
           <button

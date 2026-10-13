@@ -223,6 +223,7 @@ export function Practice({
 
   return (
     <Shell
+      wide
       title={`${LEVEL_NAMES[game.level]} · you vs computer`}
       onBack={() => {
         if (!result && !window.confirm('Leave this game? It will not be saved.')) return;
@@ -233,10 +234,11 @@ export function Practice({
         {announcement}
       </p>
 
+      {/* Below the md breakpoint there is only room for one board, so a tab switches between them. */}
       <div
         role="tablist"
         aria-label="Guesses"
-        className="mb-1 grid grid-cols-2 gap-1 text-sm font-bold"
+        className="mb-1 grid grid-cols-2 gap-1 text-sm font-bold md:hidden"
       >
         {(
           [
@@ -257,21 +259,23 @@ export function Practice({
         ))}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto" data-testid="boards">
-        {tab === 'mine' ? (
-          <>
-            <Board title="You" rows={mine} emptyText="Make your first guess below." />
-            <div className="mt-3">
-              <Notepad />
-            </div>
-          </>
-        ) : (
+      <div
+        className="min-h-0 flex-1 overflow-y-auto md:grid md:grid-cols-2 md:gap-6 md:overflow-visible"
+        data-testid="boards"
+      >
+        <div className={tab === 'mine' ? 'block' : 'hidden md:block'}>
+          <Board title="You" rows={mine} emptyText="Make your first guess below." />
+          <div className="mt-3">
+            <Notepad />
+          </div>
+        </div>
+        <div className={tab === 'theirs' ? 'block' : 'hidden md:block'}>
           <Board
             title="Computer, guessing your number"
             rows={theirs}
             emptyText="The computer has not guessed yet."
           />
-        )}
+        </div>
       </div>
 
       {result ? (
